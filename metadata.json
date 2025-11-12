@@ -1,0 +1,7 @@
+{
+  "name": "Several Budget Manager",
+  "description": "A Progressive Web App (PWA) to manage budgets and expenses. Features include a visual donut chart for budget allocation, detailed expense tracking, data export/import, and an offline-first approach using IndexedDB.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

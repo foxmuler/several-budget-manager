@@ -1,0 +1,25 @@
+{
+  "short_name": "Several",
+  "name": "Several Budget Manager",
+  "description": "Una aplicación progresiva para gestionar presupuestos y gastos de manera eficiente.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/781/781760.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/781/781760.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#0ea5e9",
+  "orientation": "portrait"
+}

@@ -5,7 +5,7 @@ import Sidebar from './Sidebar';
 import ToastContainer from '../ui/ToastContainer';
 
 // FIX: Removed React.FC to align with modern React practices and explicitly typed the 'children' prop.
-const Layout = ({ children }: { children: ReactNode }) => {
+const Layout = ({ children }: { children?: ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (

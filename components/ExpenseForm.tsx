@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Expense } from '../types';
 import { useAppContext } from '../context/AppContext';
 import CameraScannerModal from './ui/CameraScannerModal';
@@ -17,12 +17,32 @@ const CameraIcon = ({ className }: { className: string }) => (
 
 
 const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProps) => {
-    const { budgets, addExpense, updateExpense, getBudgetRemaining, expenses, addToast } = useAppContext();
+    const { budgets, addExpense, updateExpense, getBudgetRemaining, expenses, addToast, budgetSortOrder, getBudgetExpenses } = useAppContext();
+
+    const sortedBudgets = useMemo(() => {
+        const budgetsCopy = [...budgets];
+        switch (budgetSortOrder) {
+            case 'date-asc':
+                return budgetsCopy.sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime());
+            case 'remaining-desc':
+                return budgetsCopy.sort((a, b) => getBudgetRemaining(b.id) - getBudgetRemaining(a.id));
+            case 'remaining-asc':
+                return budgetsCopy.sort((a, b) => getBudgetRemaining(a.id) - getBudgetRemaining(b.id));
+            case 'expenses-desc':
+                return budgetsCopy.sort((a, b) => getBudgetExpenses(b.id).length - getBudgetExpenses(a.id).length);
+            case 'expenses-asc':
+                return budgetsCopy.sort((a, b) => getBudgetExpenses(a.id).length - getBudgetExpenses(b.id).length);
+            case 'date-desc':
+            default:
+                return budgetsCopy.sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
+        }
+    }, [budgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses]);
+
     const [formData, setFormData] = useState({
         numeroRefGasto: '',
         descripcion: '',
         importe: '0',
-        presupuestoId: defaultBudgetId || (budgets.length > 0 ? budgets[0].id : ''),
+        presupuestoId: defaultBudgetId || '',
     });
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
@@ -35,8 +55,16 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 importe: String(expenseToEdit.importe),
                 presupuestoId: expenseToEdit.presupuestoId,
             });
+        } else {
+             // For new expenses, set the default budget based on the sorted list.
+             // This also handles the case where budgets load asynchronously.
+            setFormData(prev => ({
+                ...prev, // Keep scanned data if any
+                presupuestoId: defaultBudgetId || (sortedBudgets.length > 0 ? sortedBudgets[0].id : ''),
+            }));
         }
-    }, [expenseToEdit]);
+    }, [expenseToEdit, sortedBudgets, defaultBudgetId]);
+
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -105,7 +133,7 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 <div>
                     <label htmlFor="presupuestoId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asociar a Capital</label>
                     <select id="presupuestoId" name="presupuestoId" value={formData.presupuestoId} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500">
-                        {budgets.map(b => (
+                        {sortedBudgets.map(b => (
                             <option key={b.id} value={b.id}>
                                 {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
                             </option>

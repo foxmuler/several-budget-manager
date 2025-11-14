@@ -1,6 +1,8 @@
+
 import React, { createContext, useContext, useEffect, useReducer, ReactNode, useCallback, ReactElement } from 'react';
 import { Budget, Expense, Theme, ToastMessage, ToastType, BudgetSortOrder, ExpenseSortOrder } from '../types';
 import * as storage from '../services/storage';
+import { DEFAULT_ZERO_BALANCE_COLOR } from '../constants';
 
 interface AppState {
   budgets: Budget[];
@@ -11,10 +13,12 @@ interface AppState {
   lastDeletedExpense: Expense | null;
   budgetSortOrder: BudgetSortOrder;
   expenseSortOrder: ExpenseSortOrder;
+  manualBudgetOrder: string[];
+  zeroBalanceColor: string;
 }
 
 type Action =
-  | { type: 'SET_DATA'; payload: { budgets: Budget[]; expenses: Expense[] } }
+  | { type: 'SET_DATA'; payload: { budgets: Budget[]; expenses: Expense[]; manualBudgetOrder: string[]; zeroBalanceColor: string; } }
   | { type: 'ADD_BUDGET'; payload: Budget }
   | { type: 'UPDATE_BUDGET'; payload: Budget }
   | { type: 'DELETE_BUDGET'; payload: string }
@@ -29,6 +33,8 @@ type Action =
   | { type: 'REASSIGN_AND_DELETE_BUDGET'; payload: { sourceBudgetId: string; targetBudgetId: string } }
   | { type: 'MOVE_EXPENSE'; payload: { expenseId: string; targetBudgetId: string } }
   | { type: 'SET_BUDGET_SORT_ORDER'; payload: BudgetSortOrder }
+  | { type: 'SET_MANUAL_BUDGET_ORDER'; payload: string[] }
+  | { type: 'SET_ZERO_BALANCE_COLOR'; payload: string }
   | { type: 'SET_EXPENSE_SORT_ORDER'; payload: ExpenseSortOrder };
 
 
@@ -41,6 +47,8 @@ const initialState: AppState = {
   lastDeletedExpense: null,
   budgetSortOrder: (localStorage.getItem('budgetSortOrder') as BudgetSortOrder) || 'date-desc',
   expenseSortOrder: (localStorage.getItem('expenseSortOrder') as ExpenseSortOrder) || 'date-desc',
+  manualBudgetOrder: [],
+  zeroBalanceColor: DEFAULT_ZERO_BALANCE_COLOR,
 };
 
 const appReducer = (state: AppState, action: Action): AppState => {
@@ -48,7 +56,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'SET_DATA':
       return { ...state, ...action.payload, loading: false };
     case 'ADD_BUDGET':
-      return { ...state, budgets: [...state.budgets, action.payload] };
+      return { ...state, budgets: [...state.budgets, action.payload], manualBudgetOrder: [...state.manualBudgetOrder, action.payload.id] };
     case 'UPDATE_BUDGET':
       return {
         ...state,
@@ -62,6 +70,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
         ...state,
         budgets: state.budgets.filter((b) => b.id !== budgetId),
         expenses: state.expenses.filter((e) => e.presupuestoId !== budgetId),
+        manualBudgetOrder: state.manualBudgetOrder.filter(id => id !== budgetId),
       };
     }
     case 'ADD_EXPENSE':
@@ -91,10 +100,14 @@ const appReducer = (state: AppState, action: Action): AppState => {
       return { ...state, theme: action.payload };
     case 'SET_BUDGET_SORT_ORDER':
       return { ...state, budgetSortOrder: action.payload };
+    case 'SET_MANUAL_BUDGET_ORDER':
+        return { ...state, manualBudgetOrder: action.payload, budgetSortOrder: 'manual' };
+    case 'SET_ZERO_BALANCE_COLOR':
+        return { ...state, zeroBalanceColor: action.payload };
     case 'SET_EXPENSE_SORT_ORDER':
       return { ...state, expenseSortOrder: action.payload };
     case 'IMPORT_DATA':
-      return { ...state, budgets: action.payload.budgets, expenses: action.payload.expenses };
+      return { ...state, budgets: action.payload.budgets, expenses: action.payload.expenses, manualBudgetOrder: action.payload.budgets.map(b => b.id) };
     case 'ADD_TOAST':
       return { ...state, toasts: [action.payload, ...state.toasts.filter(t => t.onUndo)] }; // Allow only one undo toast
     case 'REMOVE_TOAST':
@@ -107,6 +120,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
           e.presupuestoId === sourceBudgetId ? { ...e, presupuestoId: targetBudgetId } : e
         ),
         budgets: state.budgets.filter(b => b.id !== sourceBudgetId),
+        manualBudgetOrder: state.manualBudgetOrder.filter(id => id !== sourceBudgetId),
       };
     }
     case 'MOVE_EXPENSE': {
@@ -127,6 +141,7 @@ interface AppContextType extends AppState {
   dispatch: React.Dispatch<Action>;
   getBudgetExpenses: (budgetId: string) => Expense[];
   getBudgetRemaining: (budgetId: string) => number;
+  getBudgetEffectiveColor: (budget: Budget) => string;
   addBudget: (budget: Omit<Budget, 'id' | 'fechaCreacion' | 'fechaModificacion'>) => void;
   updateBudget: (budget: Budget) => void;
   deleteBudget: (budgetId: string) => void;
@@ -136,6 +151,8 @@ interface AppContextType extends AppState {
   undoDeleteExpense: () => void;
   setTheme: (theme: Theme) => void;
   setBudgetSortOrder: (order: BudgetSortOrder) => void;
+  setManualBudgetOrder: (order: string[]) => void;
+  setZeroBalanceColor: (color: string) => void;
   setExpenseSortOrder: (order: ExpenseSortOrder) => void;
   importData: (data: { budgets: Budget[], expenses: Expense[]}) => void;
   addToast: (message: string, type: ToastType, options?: { onUndo?: () => void }) => void;
@@ -154,7 +171,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     const loadData = async () => {
       const budgets = await storage.getBudgets();
       const expenses = await storage.getExpenses();
-      dispatch({ type: 'SET_DATA', payload: { budgets, expenses } });
+      const manualBudgetOrder = await storage.getManualBudgetOrder();
+      const zeroBalanceColor = await storage.getZeroBalanceColor();
+      dispatch({ type: 'SET_DATA', payload: { budgets, expenses, manualBudgetOrder, zeroBalanceColor: zeroBalanceColor || DEFAULT_ZERO_BALANCE_COLOR } });
     };
     loadData();
   }, []);
@@ -163,8 +182,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     if (!state.loading) {
       storage.saveBudgets(state.budgets);
       storage.saveExpenses(state.expenses);
+      storage.saveManualBudgetOrder(state.manualBudgetOrder);
+      storage.saveZeroBalanceColor(state.zeroBalanceColor);
     }
-  }, [state.budgets, state.expenses, state.loading]);
+  }, [state.budgets, state.expenses, state.manualBudgetOrder, state.zeroBalanceColor, state.loading]);
 
   useEffect(() => {
     if (state.theme === 'dark') {
@@ -205,6 +226,14 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     
     return initialAvailable - totalSpent;
   }, [state.budgets, getBudgetExpenses]);
+
+  const getBudgetEffectiveColor = useCallback((budget: Budget): string => {
+    const remaining = getBudgetRemaining(budget.id);
+    if (remaining <= 0) {
+      return state.zeroBalanceColor;
+    }
+    return budget.color;
+  }, [getBudgetRemaining, state.zeroBalanceColor]);
 
 
   const addBudget = (budget: Omit<Budget, 'id' | 'fechaCreacion' | 'fechaModificacion'>) => {
@@ -256,6 +285,14 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     dispatch({ type: 'SET_BUDGET_SORT_ORDER', payload: order });
   };
 
+  const setManualBudgetOrder = (order: string[]) => {
+    dispatch({ type: 'SET_MANUAL_BUDGET_ORDER', payload: order });
+  };
+
+  const setZeroBalanceColor = (color: string) => {
+    dispatch({ type: 'SET_ZERO_BALANCE_COLOR', payload: color });
+  };
+
   const setExpenseSortOrder = (order: ExpenseSortOrder) => {
     dispatch({ type: 'SET_EXPENSE_SORT_ORDER', payload: order });
   };
@@ -282,7 +319,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importData, addToast, removeToast, reassignAndDeleteBudget, moveExpense }}>
+    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, getBudgetEffectiveColor, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setManualBudgetOrder, setZeroBalanceColor, setExpenseSortOrder, importData, addToast, removeToast, reassignAndDeleteBudget, moveExpense }}>
       {children}
     </AppContext.Provider>
   );

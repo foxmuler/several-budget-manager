@@ -43,13 +43,13 @@ const HomePage = () => {
                 // FIX: Corrected manual sorting logic. The original implementation caused a TypeScript error because the compiler
                 // couldn't infer that `indexA` and `indexB` were numbers within the conditional block.
                 // This revised structure allows for correct type narrowing.
-                if (indexA !== undefined && indexB !== undefined) {
+                if (typeof indexA === 'number' && typeof indexB === 'number') {
                     return indexA - indexB;
                 }
-                if (indexA !== undefined) {
+                if (typeof indexA === 'number') {
                     return -1; // a is in order, b is not -> a comes first
                 }
-                if (indexB !== undefined) {
+                if (typeof indexB === 'number') {
                     return 1; // b is in order, a is not -> b comes first
                 }
                 return 0; // neither are in order -> maintain relative order
@@ -187,7 +187,7 @@ const HomePage = () => {
                     aria-label="Añadir Capital"
                     className="flex items-center justify-center w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg hover:bg-primary-700 transition-transform transform hover:scale-110"
                 >
-                    <AddIcon className="w-8 h-8" />
+                    <AddIcon className="w-9 h-9" />
                 </button>
             </div>
             
@@ -200,7 +200,7 @@ const HomePage = () => {
                     aria-label="Añadir Gasto"
                     className="flex items-center justify-center w-14 h-14 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-transform transform hover:scale-110 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                    <AddIcon className="w-8 h-8" />
+                    <AddIcon className="w-9 h-9" />
                 </button>
             </div>
             

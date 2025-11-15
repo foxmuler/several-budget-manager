@@ -236,6 +236,7 @@ interface AppContextType extends AppState {
   moveExpense: (expenseId: string, targetBudgetId: string) => void;
   setManualBudgetOrder: (order: string[]) => void;
   setArchivedBudgetColor: (color: string) => void;
+  resetApp: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -405,8 +406,20 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     dispatch({ type: 'MOVE_EXPENSE', payload: { expenseId, targetBudgetId } });
   };
 
+  const resetApp = async () => {
+    await storage.clearAllData();
+    localStorage.removeItem('theme');
+    localStorage.removeItem('budgetSortOrder');
+    localStorage.removeItem('expenseSortOrder');
+    localStorage.removeItem('archivedBudgetColor');
+    addToast('Aplicación reseteada. Recargando...', 'success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  };
+
   return (
-    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importFullBackup, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder, setArchivedBudgetColor }}>
+    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importFullBackup, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder, setArchivedBudgetColor, resetApp }}>
       {children}
     </AppContext.Provider>
   );

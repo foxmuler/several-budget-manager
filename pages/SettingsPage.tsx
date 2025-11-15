@@ -1,9 +1,10 @@
 
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Theme, BudgetSortOrder, ExpenseSortOrder, AppConfig, AppData } from '../types';
 import { APP_VERSION } from '../constants';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 
 const SettingsPage = () => {
     const { 
@@ -11,9 +12,10 @@ const SettingsPage = () => {
         budgetSortOrder, setBudgetSortOrder, 
         expenseSortOrder, setExpenseSortOrder, 
         archivedBudgetColor, setArchivedBudgetColor,
-        manualBudgetOrder, importFullBackup
+        manualBudgetOrder, importFullBackup, resetApp
     } = useAppContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
     const handleExport = () => {
         const data = {
@@ -136,6 +138,11 @@ const SettingsPage = () => {
         }
     };
     
+    const handleConfirmReset = () => {
+        setIsResetModalOpen(false);
+        resetApp();
+    };
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Configuración</h1>
@@ -215,23 +222,54 @@ const SettingsPage = () => {
             </div>
 
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg">
-                <h2 className="text-lg font-semibold mb-3">Datos</h2>
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <button 
-                        onClick={handleExport}
-                        className="w-full sm:w-auto flex-1 text-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                        Exportar a JSON
-                    </button>
-                    <button 
-                        onClick={handleImportClick}
-                        className="w-full sm:w-auto flex-1 text-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                        Importar desde JSON
-                    </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
+                <h2 className="text-lg font-semibold mb-3">Backup</h2>
+                <div className="space-y-3">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Exporta todos tus datos y configuraciones a un archivo JSON, o impórtalos para restaurar un estado anterior.</p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button 
+                            onClick={handleExport}
+                            className="w-full sm:w-auto flex-1 text-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Exportar a JSON
+                        </button>
+                        <button 
+                            onClick={handleImportClick}
+                            className="w-full sm:w-auto flex-1 text-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                            Importar desde JSON
+                        </button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
+                    </div>
+                    <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <h3 className="text-md font-semibold mb-2 text-red-600 dark:text-red-400">Zona de Peligro</h3>
+                        <button
+                            onClick={() => setIsResetModalOpen(true)}
+                            className="w-full text-center px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-500 hover:text-white dark:hover:bg-red-600 transition-colors"
+                        >
+                            Resetear Aplicación
+                        </button>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Esta acción eliminará permanentemente todos los datos y configuraciones.</p>
+                    </div>
                 </div>
             </div>
+
+            <ConfirmationModal
+                isOpen={isResetModalOpen}
+                onClose={() => setIsResetModalOpen(false)}
+                onConfirm={handleConfirmReset}
+                title="Confirmar Reseteo Total"
+                message={
+                    <>
+                        <p>¿Estás seguro de que quieres resetear la aplicación?</p>
+                        <p className="font-bold text-red-500 mt-2">
+                            Todos los datos (capitales, gastos) y configuraciones serán eliminados permanentemente.
+                            La aplicación volverá a su estado inicial de fábrica.
+                        </p>
+                    </>
+                }
+                confirmButtonText="Sí, Resetear"
+                confirmButtonClass="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+            />
         </div>
     );
 };

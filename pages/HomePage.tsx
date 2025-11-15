@@ -14,13 +14,14 @@ const AddIcon = ({ className }: { className: string }) => (
 );
 
 const HomePage = () => {
-    const { budgets, loading, getBudgetExpenses, deleteBudget, reassignAndDeleteBudget, addToast, budgetSortOrder, getBudgetRemaining } = useAppContext();
+    const { budgets, loading, getBudgetExpenses, deleteBudget, reassignAndDeleteBudget, addToast, budgetSortOrder, getBudgetRemaining, manualBudgetOrder, setManualBudgetOrder, setBudgetSortOrder } = useAppContext();
     const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
     const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
     const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
     const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
+    const [draggedId, setDraggedId] = useState<string | null>(null);
     
     const availableBudgetsForReassign = useMemo(() => {
         if (!budgetToDelete) return [];
@@ -29,6 +30,23 @@ const HomePage = () => {
 
     const sortedBudgets = useMemo(() => {
         const budgetsCopy = [...budgets];
+        if (budgetSortOrder === 'manual') {
+            const orderMap = new Map(manualBudgetOrder.map((id, index) => [id, index]));
+            return budgetsCopy.sort((a, b) => {
+                const indexA = orderMap.get(a.id);
+                const indexB = orderMap.get(b.id);
+                // FIX: Corrected the manual sorting logic to be more robust and prevent a potential TypeScript type error.
+                // This new implementation explicitly handles cases where budgets might not be in the manual order map,
+                // ensuring that subtraction is only performed on numbers.
+                if (indexA === undefined) {
+                    return indexB === undefined ? 0 : 1;
+                }
+                if (indexB === undefined) {
+                    return -1;
+                }
+                return indexA - indexB;
+            });
+        }
         switch (budgetSortOrder) {
             case 'date-asc':
                 return budgetsCopy.sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime());
@@ -44,7 +62,7 @@ const HomePage = () => {
             default:
                 return budgetsCopy.sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
         }
-    }, [budgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses]);
+    }, [budgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses, manualBudgetOrder]);
 
 
     const handleDeleteRequest = (budget: Budget) => {
@@ -91,6 +109,35 @@ const HomePage = () => {
         setBudgetToDelete(null);
     };
 
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, budget: Budget) => {
+        setDraggedId(budget.id);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', budget.id);
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>, targetBudget: Budget) => {
+        e.preventDefault();
+        if (!draggedId || draggedId === targetBudget.id) return;
+
+        const currentOrder = manualBudgetOrder.length > 0 ? manualBudgetOrder : sortedBudgets.map(b => b.id);
+        const draggedIndex = currentOrder.findIndex(id => id === draggedId);
+        const targetIndex = currentOrder.findIndex(id => id === targetBudget.id);
+
+        if (draggedIndex === -1 || targetIndex === -1 || draggedIndex === targetIndex) return;
+
+        const newOrder = [...currentOrder];
+        const [removed] = newOrder.splice(draggedIndex, 1);
+        newOrder.splice(targetIndex, 0, removed);
+        
+        setManualBudgetOrder(newOrder);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedId(null);
+        setBudgetSortOrder('manual');
+    };
+
+
     if (loading) {
         return <div className="text-center p-8">Cargando datos...</div>;
     }
@@ -102,7 +149,16 @@ const HomePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sortedBudgets.length > 0 ? (
                     sortedBudgets.map(budget => (
-                        <BudgetCard key={budget.id} budget={budget} onDeleteRequest={handleDeleteRequest} />
+                        <div
+                            key={budget.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, budget)}
+                            onDragOver={(e) => handleDragOver(e, budget)}
+                            onDragEnd={handleDragEnd}
+                            className={`transition-opacity ${draggedId === budget.id ? 'opacity-30' : 'opacity-100'}`}
+                        >
+                            <BudgetCard budget={budget} onDeleteRequest={handleDeleteRequest} />
+                        </div>
                     ))
                 ) : (
                     <div className="col-span-full text-center py-10 px-4 bg-white dark:bg-gray-800 rounded-lg shadow">

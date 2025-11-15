@@ -91,6 +91,7 @@ const SettingsPage = () => {
                         onChange={(e) => setBudgetSortOrder(e.target.value as BudgetSortOrder)}
                         className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
                     >
+                        <option value="manual">Orden Manual</option>
                         <option value="date-desc">Fecha (más reciente)</option>
                         <option value="date-asc">Fecha (más antiguo)</option>
                         <option value="remaining-desc">Capital restante (mayor a menor)</option>

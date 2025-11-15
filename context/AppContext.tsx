@@ -11,6 +11,7 @@ interface AppState {
   lastDeletedExpense: Expense | null;
   budgetSortOrder: BudgetSortOrder;
   expenseSortOrder: ExpenseSortOrder;
+  manualBudgetOrder: string[];
 }
 
 type Action =
@@ -29,7 +30,8 @@ type Action =
   | { type: 'REASSIGN_AND_DELETE_BUDGET'; payload: { sourceBudgetId: string; targetBudgetId: string } }
   | { type: 'MOVE_EXPENSE'; payload: { expenseId: string; targetBudgetId: string } }
   | { type: 'SET_BUDGET_SORT_ORDER'; payload: BudgetSortOrder }
-  | { type: 'SET_EXPENSE_SORT_ORDER'; payload: ExpenseSortOrder };
+  | { type: 'SET_EXPENSE_SORT_ORDER'; payload: ExpenseSortOrder }
+  | { type: 'SET_MANUAL_BUDGET_ORDER'; payload: string[] };
 
 
 const initialState: AppState = {
@@ -39,8 +41,9 @@ const initialState: AppState = {
   theme: (localStorage.getItem('theme') as Theme) || 'system',
   toasts: [],
   lastDeletedExpense: null,
-  budgetSortOrder: (localStorage.getItem('budgetSortOrder') as BudgetSortOrder) || 'date-desc',
+  budgetSortOrder: (localStorage.getItem('budgetSortOrder') as BudgetSortOrder) || 'manual',
   expenseSortOrder: (localStorage.getItem('expenseSortOrder') as ExpenseSortOrder) || 'date-desc',
+  manualBudgetOrder: [],
 };
 
 const appReducer = (state: AppState, action: Action): AppState => {
@@ -48,7 +51,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'SET_DATA':
       return { ...state, ...action.payload, loading: false };
     case 'ADD_BUDGET':
-      return { ...state, budgets: [...state.budgets, action.payload] };
+      return { ...state, budgets: [...state.budgets, action.payload], manualBudgetOrder: [...state.manualBudgetOrder, action.payload.id] };
     case 'UPDATE_BUDGET':
       return {
         ...state,
@@ -62,6 +65,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
         ...state,
         budgets: state.budgets.filter((b) => b.id !== budgetId),
         expenses: state.expenses.filter((e) => e.presupuestoId !== budgetId),
+        manualBudgetOrder: state.manualBudgetOrder.filter(id => id !== budgetId),
       };
     }
     case 'ADD_EXPENSE':
@@ -107,6 +111,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
           e.presupuestoId === sourceBudgetId ? { ...e, presupuestoId: targetBudgetId } : e
         ),
         budgets: state.budgets.filter(b => b.id !== sourceBudgetId),
+        manualBudgetOrder: state.manualBudgetOrder.filter(id => id !== sourceBudgetId),
       };
     }
     case 'MOVE_EXPENSE': {
@@ -118,6 +123,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
         ),
       };
     }
+     case 'SET_MANUAL_BUDGET_ORDER':
+        return { ...state, manualBudgetOrder: action.payload };
     default:
       return state;
   }
@@ -142,6 +149,7 @@ interface AppContextType extends AppState {
   removeToast: (id: string) => void;
   reassignAndDeleteBudget: (sourceBudgetId: string, targetBudgetId: string) => void;
   moveExpense: (expenseId: string, targetBudgetId: string) => void;
+  setManualBudgetOrder: (order: string[]) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -154,7 +162,22 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     const loadData = async () => {
       const budgets = await storage.getBudgets();
       const expenses = await storage.getExpenses();
+      let manualOrder = await storage.getManualBudgetOrder();
+
+      if (manualOrder.length === 0 && budgets.length > 0) {
+        manualOrder = budgets.map(b => b.id);
+      } else {
+        const budgetIds = new Set(budgets.map(b => b.id));
+        manualOrder = manualOrder.filter(id => budgetIds.has(id));
+        budgets.forEach(b => {
+            if (!manualOrder.includes(b.id)) {
+                manualOrder.push(b.id);
+            }
+        });
+      }
+      
       dispatch({ type: 'SET_DATA', payload: { budgets, expenses } });
+      dispatch({ type: 'SET_MANUAL_BUDGET_ORDER', payload: manualOrder });
     };
     loadData();
   }, []);
@@ -163,8 +186,9 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     if (!state.loading) {
       storage.saveBudgets(state.budgets);
       storage.saveExpenses(state.expenses);
+      storage.saveManualBudgetOrder(state.manualBudgetOrder);
     }
-  }, [state.budgets, state.expenses, state.loading]);
+  }, [state.budgets, state.expenses, state.manualBudgetOrder, state.loading]);
 
   useEffect(() => {
     if (state.theme === 'dark') {
@@ -259,6 +283,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const setExpenseSortOrder = (order: ExpenseSortOrder) => {
     dispatch({ type: 'SET_EXPENSE_SORT_ORDER', payload: order });
   };
+  
+  const setManualBudgetOrder = (order: string[]) => {
+    dispatch({ type: 'SET_MANUAL_BUDGET_ORDER', payload: order });
+  }
 
   const importData = (data: { budgets: Budget[], expenses: Expense[]}) => {
     dispatch({ type: 'IMPORT_DATA', payload: data });
@@ -282,7 +310,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importData, addToast, removeToast, reassignAndDeleteBudget, moveExpense }}>
+    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importData, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder }}>
       {children}
     </AppContext.Provider>
   );

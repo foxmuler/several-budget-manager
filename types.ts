@@ -36,7 +36,8 @@ export type BudgetSortOrder =
   | 'remaining-desc'
   | 'remaining-asc'
   | 'expenses-desc'
-  | 'expenses-asc';
+  | 'expenses-asc'
+  | 'manual';
 
 export type ExpenseSortOrder =
   | 'date-desc'

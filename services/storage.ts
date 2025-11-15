@@ -10,6 +10,7 @@ localforage.config({
 
 const BUDGETS_KEY = 'budgets';
 const EXPENSES_KEY = 'expenses';
+const MANUAL_BUDGET_ORDER_KEY = 'manualBudgetOrder';
 
 export const getBudgets = async (): Promise<Budget[]> => {
   const budgets = await localforage.getItem<Budget[]>(BUDGETS_KEY);
@@ -29,7 +30,18 @@ export const saveExpenses = async (expenses: Expense[]): Promise<Expense[]> => {
   return localforage.setItem<Expense[]>(EXPENSES_KEY, expenses);
 };
 
+export const getManualBudgetOrder = async (): Promise<string[]> => {
+  const order = await localforage.getItem<string[]>(MANUAL_BUDGET_ORDER_KEY);
+  return order || [];
+};
+
+export const saveManualBudgetOrder = async (order: string[]): Promise<string[]> => {
+  return localforage.setItem<string[]>(MANUAL_BUDGET_ORDER_KEY, order);
+};
+
+
 export const clearAllData = async (): Promise<void> => {
   await localforage.removeItem(BUDGETS_KEY);
   await localforage.removeItem(EXPENSES_KEY);
+  await localforage.removeItem(MANUAL_BUDGET_ORDER_KEY);
 };

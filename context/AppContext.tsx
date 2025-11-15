@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useReducer, ReactNode, useCallback, ReactElement } from 'react';
-import { Budget, Expense, Theme, ToastMessage, ToastType, BudgetSortOrder, ExpenseSortOrder } from '../types';
+import { Budget, Expense, Theme, ToastMessage, ToastType, BudgetSortOrder, ExpenseSortOrder, AppData, AppConfig } from '../types';
 import * as storage from '../services/storage';
 import { PREDEFINED_COLORS, DEFAULT_ARCHIVED_COLOR } from '../constants';
 
@@ -26,7 +26,6 @@ type Action =
   | { type: 'DELETE_EXPENSE'; payload: string }
   | { type: 'UNDO_DELETE_EXPENSE' }
   | { type: 'SET_THEME'; payload: Theme }
-  | { type: 'IMPORT_DATA', payload: { budgets: Budget[], expenses: Expense[] } }
   | { type: 'ADD_TOAST'; payload: ToastMessage }
   | { type: 'REMOVE_TOAST'; payload: string }
   | { type: 'REASSIGN_AND_DELETE_BUDGET'; payload: { sourceBudgetId: string; targetBudgetId: string } }
@@ -34,7 +33,8 @@ type Action =
   | { type: 'SET_BUDGET_SORT_ORDER'; payload: BudgetSortOrder }
   | { type: 'SET_EXPENSE_SORT_ORDER'; payload: ExpenseSortOrder }
   | { type: 'SET_MANUAL_BUDGET_ORDER'; payload: string[] }
-  | { type: 'SET_ARCHIVED_BUDGET_COLOR', payload: string };
+  | { type: 'SET_ARCHIVED_BUDGET_COLOR', payload: string }
+  | { type: 'IMPORT_FULL_BACKUP'; payload: { data: AppData, config: Partial<AppConfig> } };
 
 
 const initialState: AppState = {
@@ -145,11 +145,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
       return { ...state, budgetSortOrder: action.payload };
     case 'SET_EXPENSE_SORT_ORDER':
       return { ...state, expenseSortOrder: action.payload };
-    case 'IMPORT_DATA': {
-        const { budgets, expenses } = action.payload;
-        const updatedBudgets = checkAndApplyArchiveStatus(budgets, expenses, state.archivedBudgetColor);
-        return { ...state, budgets: updatedBudgets, expenses: expenses };
-    }
     case 'ADD_TOAST':
       return { ...state, toasts: [action.payload, ...state.toasts.filter(t => t.onUndo)] }; // Allow only one undo toast
     case 'REMOVE_TOAST':
@@ -187,6 +182,34 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return b;
         });
         return { ...state, archivedBudgetColor: action.payload, budgets: budgetsWithNewArchiveColor };
+    case 'IMPORT_FULL_BACKUP': {
+        const { data, config } = action.payload;
+        const { budgets, expenses, manualBudgetOrder } = data;
+        
+        // Use imported archived color for the check, or current state's one if not present
+        const finalArchivedColor = config.archivedBudgetColor || state.archivedBudgetColor;
+        const updatedBudgets = checkAndApplyArchiveStatus(budgets, expenses, finalArchivedColor);
+
+        // Ensure manualBudgetOrder is synced with imported budgets
+        const budgetIds = new Set(budgets.map(b => b.id));
+        let syncedManualOrder = (manualBudgetOrder || []).filter(id => budgetIds.has(id));
+        budgets.forEach(b => {
+            if (!syncedManualOrder.includes(b.id)) {
+                syncedManualOrder.push(b.id);
+            }
+        });
+
+        return {
+            ...state,
+            budgets: updatedBudgets,
+            expenses,
+            manualBudgetOrder: syncedManualOrder,
+            theme: config.theme || state.theme,
+            budgetSortOrder: config.budgetSortOrder || state.budgetSortOrder,
+            expenseSortOrder: config.expenseSortOrder || state.expenseSortOrder,
+            archivedBudgetColor: finalArchivedColor,
+        };
+    }
     default:
       return state;
   }
@@ -206,7 +229,7 @@ interface AppContextType extends AppState {
   setTheme: (theme: Theme) => void;
   setBudgetSortOrder: (order: BudgetSortOrder) => void;
   setExpenseSortOrder: (order: ExpenseSortOrder) => void;
-  importData: (data: { budgets: Budget[], expenses: Expense[]}) => void;
+  importFullBackup: (payload: { data: AppData, config: Partial<AppConfig> }) => void;
   addToast: (message: string, type: ToastType, options?: { onUndo?: () => void }) => void;
   removeToast: (id: string) => void;
   reassignAndDeleteBudget: (sourceBudgetId: string, targetBudgetId: string) => void;
@@ -361,8 +384,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     dispatch({ type: 'SET_ARCHIVED_BUDGET_COLOR', payload: color });
   };
 
-  const importData = (data: { budgets: Budget[], expenses: Expense[]}) => {
-    dispatch({ type: 'IMPORT_DATA', payload: data });
+  const importFullBackup = (payload: { data: AppData, config: Partial<AppConfig> }) => {
+    dispatch({ type: 'IMPORT_FULL_BACKUP', payload });
   };
 
   const addToast = useCallback((message: string, type: ToastType = 'info', options?: { onUndo?: () => void }) => {
@@ -383,7 +406,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importData, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder, setArchivedBudgetColor }}>
+    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importFullBackup, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder, setArchivedBudgetColor }}>
       {children}
     </AppContext.Provider>
   );

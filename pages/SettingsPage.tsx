@@ -2,11 +2,17 @@
 
 import React, { useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Theme, BudgetSortOrder, ExpenseSortOrder } from '../types';
-import { APP_VERSION, APP_AUTHOR } from '../constants';
+import { Theme, BudgetSortOrder, ExpenseSortOrder, AppConfig, AppData } from '../types';
+import { APP_VERSION } from '../constants';
 
 const SettingsPage = () => {
-    const { theme, setTheme, budgets, expenses, importData, addToast, budgetSortOrder, setBudgetSortOrder, expenseSortOrder, setExpenseSortOrder, archivedBudgetColor, setArchivedBudgetColor } = useAppContext();
+    const { 
+        theme, setTheme, budgets, expenses, addToast, 
+        budgetSortOrder, setBudgetSortOrder, 
+        expenseSortOrder, setExpenseSortOrder, 
+        archivedBudgetColor, setArchivedBudgetColor,
+        manualBudgetOrder, importFullBackup
+    } = useAppContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleExport = () => {
@@ -15,8 +21,17 @@ const SettingsPage = () => {
                 version: APP_VERSION,
                 createdAt: new Date().toISOString()
             },
-            budgets,
-            expenses
+            data: {
+                budgets,
+                expenses,
+                manualBudgetOrder,
+            },
+            config: {
+                theme,
+                budgetSortOrder,
+                expenseSortOrder,
+                archivedBudgetColor,
+            }
         };
         const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
         const link = document.createElement('a');
@@ -29,6 +44,21 @@ const SettingsPage = () => {
         fileInputRef.current?.click();
     };
 
+    const compareVersions = (v1: string, v2: string): number => {
+        const parts1 = v1.split('.').map(Number);
+        const parts2 = v2.split('.').map(Number);
+        const len = Math.max(parts1.length, parts2.length);
+
+        for (let i = 0; i < len; i++) {
+            const p1 = isNaN(parts1[i]) ? 0 : parts1[i];
+            const p2 = isNaN(parts2[i]) ? 0 : parts2[i];
+            if (p1 > p2) return 1;
+            if (p1 < p2) return -1;
+        }
+        return 0;
+    };
+
+
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -36,20 +66,67 @@ const SettingsPage = () => {
             reader.onload = (e) => {
                 try {
                     const text = e.target?.result;
-                    if (typeof text !== 'string') throw new Error('File could not be read');
-                    const data = JSON.parse(text);
-                    if (data.budgets && data.expenses) {
-                         if (window.confirm('¿Importar datos? Esto sobreescribirá todos los datos actuales.')) {
-                            importData({ budgets: data.budgets, expenses: data.expenses });
-                            addToast('Datos importados con éxito.', 'success');
-                         }
+                    if (typeof text !== 'string') throw new Error('No se pudo leer el archivo.');
+                    
+                    const importedJson = JSON.parse(text);
+
+                    let dataToImport: AppData;
+                    let configToImport: Partial<AppConfig>;
+                    
+                    // Check for new structured format
+                    if (importedJson.meta && importedJson.data && importedJson.config) {
+                        const { meta, data, config } = importedJson;
+                        if (!meta.version || !data.budgets || !data.expenses) {
+                             throw new Error('Archivo de backup (formato nuevo) no válido o corrupto.');
+                        }
+                        
+                        dataToImport = data;
+                        const backupVersion = meta.version;
+                        const currentVersion = APP_VERSION;
+                        const KNOWN_CONFIG_KEYS_CURRENT = ['theme', 'budgetSortOrder', 'expenseSortOrder', 'archivedBudgetColor'];
+                        
+                        let finalConfig: Partial<AppConfig> = {};
+
+                        if (compareVersions(backupVersion, currentVersion) > 0) {
+                            // Backup is from a newer version
+                            const unsupportedKeys = Object.keys(config).filter(key => !KNOWN_CONFIG_KEYS_CURRENT.includes(key));
+                            if (unsupportedKeys.length > 0) {
+                                addToast(
+                                    `Backup v${backupVersion} > App v${currentVersion}. No se importarán: ${unsupportedKeys.join(', ')}`,
+                                    'info'
+                                );
+                            }
+                            // Filter config to only include known keys
+                            KNOWN_CONFIG_KEYS_CURRENT.forEach(key => {
+                                if (key in config) {
+                                    (finalConfig as any)[key] = config[key];
+                                }
+                            });
+                        } else {
+                            finalConfig = config;
+                        }
+                        configToImport = finalConfig;
+
+                    } else if (importedJson.budgets && importedJson.expenses) {
+                        // Handle old flat format for backward compatibility
+                        addToast('Importando desde un formato de backup antiguo. Solo se importarán datos.', 'info');
+                        dataToImport = {
+                            budgets: importedJson.budgets,
+                            expenses: importedJson.expenses,
+                            manualBudgetOrder: importedJson.budgets.map((b: any) => b.id) // Recreate order
+                        };
+                        configToImport = {}; // No config in old backups
                     } else {
-                        throw new Error('Archivo JSON no válido.');
+                        throw new Error('Formato de archivo de backup no reconocido.');
+                    }
+
+                    if (window.confirm('¿Importar datos? Esto sobreescribirá todos los datos actuales.')) {
+                        importFullBackup({ data: dataToImport, config: configToImport });
+                        addToast('Datos importados con éxito.', 'success');
                     }
                 } catch (error) {
                     addToast(`Error al importar el archivo: ${error instanceof Error ? error.message : String(error)}`, 'error');
                 } finally {
-                    // Reset file input
                     if(fileInputRef.current) {
                         fileInputRef.current.value = "";
                     }

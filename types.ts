@@ -49,3 +49,16 @@ export type ExpenseSortOrder =
   | 'amount-asc'
   | 'description-asc'
   | 'description-desc';
+  
+export interface AppConfig {
+  theme: Theme;
+  budgetSortOrder: BudgetSortOrder;
+  expenseSortOrder: ExpenseSortOrder;
+  archivedBudgetColor: string;
+}
+
+export interface AppData {
+  budgets: Budget[];
+  expenses: Expense[];
+  manualBudgetOrder: string[];
+}

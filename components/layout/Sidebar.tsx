@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
@@ -6,11 +7,15 @@ import { APP_VERSION, APP_AUTHOR } from '../../constants';
 import { Budget, Expense } from '../../types';
 
 const CloseIcon = ({ className }: { className: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" /></svg>
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24" fill="currentColor"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" /></svg>
 );
 const SearchIcon = ({className}: {className: string}) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
 );
+const FolderIcon = ({ className }: { className: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+);
+
 
 interface SidebarProps {
   isOpen: boolean;
@@ -23,7 +28,7 @@ type SearchResult = {
 }
 
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
-    const { budgets, expenses } = useAppContext();
+    const { budgets, expenses, getBudgetExpenses } = useAppContext();
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState({ year: '', month: '', day: '' });
     const location = useLocation();
@@ -48,6 +53,19 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             years: Array.from(yearSet).sort((a,b) => parseInt(b) - parseInt(a)), 
         };
     }, [budgets, expenses]);
+
+    const archivedBudgetsByYear = useMemo(() => {
+        return budgets
+            .filter(b => b.isArchived)
+            .reduce((acc, budget) => {
+                const year = new Date(budget.fechaModificacion).getFullYear().toString();
+                if (!acc[year]) {
+                    acc[year] = [];
+                }
+                acc[year].push(budget);
+                return acc;
+            }, {} as Record<string, Budget[]>);
+    }, [budgets]);
     
     const searchResults = useMemo((): SearchResult => {
         if (!searchTerm.trim() && !filters.year && !filters.month && !filters.day) {
@@ -76,7 +94,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
                 const termMatch = !searchTerm.trim() || e.descripcion.toLowerCase().includes(lowercasedFilter) || e.numeroRefGasto.toLowerCase().includes(lowercasedFilter);
 
-                return termMatch && yearMatch && monthMatch && dayMatch;
+                return termMatch && yearMatch && dayMatch;
             })
             .map(e => ({...e, budgetDescripcion: budgetMap.get(e.presupuestoId)?.descripcion || 'N/A' }));
 
@@ -154,7 +172,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                             <>
                                 {searchResults.budgets.length > 0 && (
                                     <div>
-                                        <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">Capitales</h3>
+                                        <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">Resultados de Capitales</h3>
                                         <div className="space-y-2">
                                             {searchResults.budgets.map(b => (
                                                 <div key={b.id} onClick={() => window.location.hash = `/budget/${b.id}`} className="block p-2 rounded-md bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
@@ -174,7 +192,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                                 )}
                                 {searchResults.expenses.length > 0 && (
                                     <div>
-                                        <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">Gastos</h3>
+                                        <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">Resultados de Gastos</h3>
                                         <div className="space-y-2">
                                             {searchResults.expenses.map(e => (
                                                 <div key={e.id} onClick={() => window.location.hash = `/budget/${e.presupuestoId}`} className="block p-2 rounded-md bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
@@ -197,7 +215,39 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                                 )}
                             </>
                         ) : (
-                             <p className="text-center text-gray-500 dark:text-gray-400 py-4">Introduce un término de búsqueda o aplica un filtro.</p>
+                             <div>
+                                <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">Capitales Archivados (BackOffice)</h3>
+                                {Object.keys(archivedBudgetsByYear).length > 0 ? (
+                                    Object.keys(archivedBudgetsByYear).sort((a,b) => parseInt(b) - parseInt(a)).map(year => (
+                                        <details key={year} className="group" open={year === currentYear.toString()}>
+                                            <summary className="flex items-center gap-2 p-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                                                <FolderIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                                                <span className="font-medium">{year}</span>
+                                            </summary>
+                                            <div className="pl-6 pt-2 space-y-2">
+                                                {archivedBudgetsByYear[year].map(b => (
+                                                    <div key={b.id} onClick={() => window.location.hash = `/budget/${b.id}`} className="block p-2 rounded-md bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }}></div>
+                                                            <div className="flex-1 truncate">
+                                                                <p className="font-medium text-gray-800 dark:text-gray-100 truncate">{b.descripcion}</p>
+                                                                <p className="text-sm text-gray-500 dark:text-gray-400">{b.numeroReferencia}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                            Total Gastado: {
+                                                                (b.capitalTotal * b.porcentajeUsable / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR'})
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </details>
+                                    ))
+                                ) : (
+                                     <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">No hay capitales archivados.</p>
+                                )}
+                             </div>
                         )}
                     </div>
                     

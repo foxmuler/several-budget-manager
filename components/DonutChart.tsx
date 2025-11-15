@@ -26,7 +26,9 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, remainingPercent
 const DonutChartComponent = () => {
     const { budgets, getBudgetRemaining } = useAppContext();
 
-    const data = budgets.map(budget => {
+    const activeBudgets = budgets.filter(b => !b.isArchived);
+
+    const data = activeBudgets.map(budget => {
         const remaining = getBudgetRemaining(budget.id);
         const initialAvailable = (budget.capitalTotal * budget.porcentajeUsable) / 100;
         const remainingPercentage = initialAvailable > 0 ? Math.max(0, (remaining / initialAvailable) * 100) : 0;
@@ -46,7 +48,7 @@ const DonutChartComponent = () => {
         }
     };
 
-    if (budgets.length === 0) {
+    if (activeBudgets.length === 0) {
         return (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 h-64 flex items-center justify-center">
                 <p className="text-gray-500 dark:text-gray-400">Añade un capital para ver el gráfico.</p>
@@ -54,8 +56,8 @@ const DonutChartComponent = () => {
         );
     }
     
-    const totalUsableCapital = budgets.reduce((sum, budget) => sum + (budget.capitalTotal * budget.porcentajeUsable) / 100, 0);
-    const totalRemaining = budgets.reduce((sum, budget) => sum + getBudgetRemaining(budget.id), 0);
+    const totalUsableCapital = activeBudgets.reduce((sum, budget) => sum + (budget.capitalTotal * budget.porcentajeUsable) / 100, 0);
+    const totalRemaining = activeBudgets.reduce((sum, budget) => sum + getBudgetRemaining(budget.id), 0);
     const totalSpent = totalUsableCapital - totalRemaining;
 
     return (

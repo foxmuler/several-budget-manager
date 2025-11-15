@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Expense } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -105,25 +106,38 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
             return;
         }
 
-        let availableBudget = getBudgetRemaining(expenseData.presupuestoId);
-        // If editing an expense within the same budget, add its original amount back to calculate available funds.
-        if (expenseToEdit && expenseToEdit.presupuestoId === expenseData.presupuestoId) {
-            availableBudget += expenseToEdit.importe;
-        }
-        
-        if (expenseData.importe > availableBudget) {
-            if (!window.confirm(`Este gasto (${expenseData.importe.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}) excede el capital restante (${getBudgetRemaining(expenseData.presupuestoId).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}). ¿Deseas continuar?`)) {
-                return;
-            }
-        }
+        const targetBudgetRemaining = getBudgetRemaining(expenseData.presupuestoId);
+        const formatCurrency = (amount: number) => amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+
 
         if (expenseToEdit) {
+            // UPDATING an existing expense
+            if (expenseToEdit.presupuestoId === expenseData.presupuestoId) {
+                // Budget is the same, check the difference
+                const diff = expenseData.importe - expenseToEdit.importe;
+                if (diff > targetBudgetRemaining) {
+                    addToast(`El importe del gasto excede el capital restante. Fondos disponibles: ${formatCurrency(targetBudgetRemaining)}`, 'error');
+                    return;
+                }
+            } else {
+                // Budget is changing, check the full amount against the new budget
+                if (expenseData.importe > targetBudgetRemaining) {
+                     addToast(`El importe del gasto excede el capital del nuevo presupuesto. Fondos disponibles: ${formatCurrency(targetBudgetRemaining)}`, 'error');
+                    return;
+                }
+            }
             updateExpense({ ...expenseToEdit, ...expenseData });
             addToast('Gasto actualizado con éxito', 'success');
         } else {
+            // ADDING a new expense
+            if (expenseData.importe > targetBudgetRemaining) {
+                addToast(`El importe del gasto excede el capital restante. Fondos disponibles: ${formatCurrency(targetBudgetRemaining)}`, 'error');
+                return;
+            }
             addExpense(expenseData);
             addToast('Gasto guardado con éxito', 'success');
         }
+        
         onSave();
     };
     
@@ -155,7 +169,7 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 
                 <div className="relative flex items-center pt-2">
                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-                    <span className="flex-shrink mx-4 text-gray-500 dark:text-gray-400 text-sm">O rellenar manualmente</span>
+                    <span className="flex-shrink mx-4 text-gray-500 dark:text-gray-400 text-sm">O rellenar manually</span>
                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
                 </div>
 

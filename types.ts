@@ -1,4 +1,5 @@
 
+
 export interface Budget {
   id: string;
   numeroReferencia: string;
@@ -8,6 +9,8 @@ export interface Budget {
   color: string;
   fechaCreacion: string;
   fechaModificacion: string;
+  isArchived?: boolean;
+  isRestored?: boolean;
 }
 
 export interface Expense {

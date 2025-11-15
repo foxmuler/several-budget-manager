@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Budget, Expense } from '../types';
 import Modal from './ui/Modal';
@@ -12,7 +13,7 @@ interface MoveExpenseModalProps {
 }
 
 const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, availableBudgets }: MoveExpenseModalProps) => {
-    const { addToast } = useAppContext();
+    const { addToast, getBudgetRemaining } = useAppContext();
     const [targetBudgetId, setTargetBudgetId] = useState<string>('');
 
     useEffect(() => {
@@ -24,11 +25,20 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
     }, [availableBudgets, isOpen]);
 
     const handleConfirm = () => {
-        if(targetBudgetId) {
-            onConfirm(targetBudgetId);
-        } else {
+        if (!targetBudgetId) {
             addToast("Por favor, selecciona un capital de destino.", 'error');
+            return;
         }
+        if (expenseToMove) {
+            const targetBudgetRemaining = getBudgetRemaining(targetBudgetId);
+            if (expenseToMove.importe > targetBudgetRemaining) {
+                const remainingStr = targetBudgetRemaining.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+                addToast(`El gasto excede el capital restante del destino. Fondos disponibles: ${remainingStr}`, 'error');
+                return;
+            }
+        }
+        
+        onConfirm(targetBudgetId);
     };
     
     if (!expenseToMove) return null;

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Budget } from '../types';
 import Modal from './ui/Modal';
@@ -8,22 +9,35 @@ interface ReassignExpensesModalProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirm: (targetBudgetId: string) => void;
+    budgetToDeleteId: string;
     budgetToDeleteName: string;
     numberOfExpenses: number;
     availableBudgets: Budget[];
 }
 
 // FIX: Removed explicit ReactElement return type to allow TypeScript to correctly infer the component's type.
-const ReassignExpensesModal = ({ isOpen, onClose, onConfirm, budgetToDeleteName, numberOfExpenses, availableBudgets }: ReassignExpensesModalProps) => {
-    const { addToast } = useAppContext();
+const ReassignExpensesModal = ({ isOpen, onClose, onConfirm, budgetToDeleteId, budgetToDeleteName, numberOfExpenses, availableBudgets }: ReassignExpensesModalProps) => {
+    const { addToast, getBudgetRemaining, getBudgetExpenses } = useAppContext();
     const [targetBudgetId, setTargetBudgetId] = useState<string>(availableBudgets.length > 0 ? availableBudgets[0].id : '');
 
     const handleConfirm = () => {
-        if(targetBudgetId) {
-            onConfirm(targetBudgetId);
-        } else {
+        if (!targetBudgetId) {
             addToast("Por favor, selecciona un capital de destino.", 'error');
+            return;
         }
+
+        const expensesToReassign = getBudgetExpenses(budgetToDeleteId);
+        const totalAmountToReassign = expensesToReassign.reduce((sum, exp) => sum + exp.importe, 0);
+        const targetBudgetRemaining = getBudgetRemaining(targetBudgetId);
+
+        if (totalAmountToReassign > targetBudgetRemaining) {
+            const totalAmountStr = totalAmountToReassign.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+            const remainingStr = targetBudgetRemaining.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+            addToast(`El total de los gastos (${totalAmountStr}) excede el capital restante del destino (${remainingStr}).`, 'error');
+            return;
+        }
+        
+        onConfirm(targetBudgetId);
     };
     
     return (

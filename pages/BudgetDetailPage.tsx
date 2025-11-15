@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
@@ -176,14 +177,17 @@ const BudgetDetailPage = () => {
                 <ExpenseForm onSave={handleCloseExpenseModal} expenseToEdit={expenseToEdit} defaultBudgetId={budget.id}/>
             </Modal>
 
-            <ReassignExpensesModal
-                isOpen={isReassignModalOpen}
-                onClose={() => setIsReassignModalOpen(false)}
-                onConfirm={handleConfirmReassignment}
-                budgetToDeleteName={budget.descripcion}
-                numberOfExpenses={expenses.length}
-                availableBudgets={availableBudgetsForReassign}
-            />
+            {budget && (
+                <ReassignExpensesModal
+                    isOpen={isReassignModalOpen}
+                    onClose={() => setIsReassignModalOpen(false)}
+                    onConfirm={handleConfirmReassignment}
+                    budgetToDeleteId={budget.id}
+                    budgetToDeleteName={budget.descripcion}
+                    numberOfExpenses={expenses.length}
+                    availableBudgets={availableBudgetsForReassign}
+                />
+            )}
 
             <MoveExpenseModal 
                 isOpen={!!expenseToMove}

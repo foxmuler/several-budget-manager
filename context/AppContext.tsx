@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useReducer, ReactNode, useCallback, ReactElement } from 'react';
 import { Budget, Expense, Theme, ToastMessage, ToastType, BudgetSortOrder, ExpenseSortOrder } from '../types';
 import * as storage from '../services/storage';
+import { PREDEFINED_COLORS, DEFAULT_ARCHIVED_COLOR } from '../constants';
 
 interface AppState {
   budgets: Budget[];
@@ -12,6 +13,7 @@ interface AppState {
   budgetSortOrder: BudgetSortOrder;
   expenseSortOrder: ExpenseSortOrder;
   manualBudgetOrder: string[];
+  archivedBudgetColor: string;
 }
 
 type Action =
@@ -31,7 +33,8 @@ type Action =
   | { type: 'MOVE_EXPENSE'; payload: { expenseId: string; targetBudgetId: string } }
   | { type: 'SET_BUDGET_SORT_ORDER'; payload: BudgetSortOrder }
   | { type: 'SET_EXPENSE_SORT_ORDER'; payload: ExpenseSortOrder }
-  | { type: 'SET_MANUAL_BUDGET_ORDER'; payload: string[] };
+  | { type: 'SET_MANUAL_BUDGET_ORDER'; payload: string[] }
+  | { type: 'SET_ARCHIVED_BUDGET_COLOR', payload: string };
 
 
 const initialState: AppState = {
@@ -44,44 +47,88 @@ const initialState: AppState = {
   budgetSortOrder: (localStorage.getItem('budgetSortOrder') as BudgetSortOrder) || 'manual',
   expenseSortOrder: (localStorage.getItem('expenseSortOrder') as ExpenseSortOrder) || 'date-desc',
   manualBudgetOrder: [],
+  archivedBudgetColor: localStorage.getItem('archivedBudgetColor') || DEFAULT_ARCHIVED_COLOR,
 };
+
+const checkAndApplyArchiveStatus = (
+    budgets: Budget[],
+    expenses: Expense[],
+    archivedColor: string
+): Budget[] => {
+    return budgets.map(budget => {
+        const budgetExpenses = expenses.filter(e => e.presupuestoId === budget.id);
+        const totalSpent = budgetExpenses.reduce((sum, e) => sum + e.importe, 0);
+        const initialAvailable = (budget.capitalTotal * budget.porcentajeUsable) / 100;
+        const remaining = initialAvailable - totalSpent;
+
+        const shouldBeArchived = remaining <= 0;
+
+        if (shouldBeArchived && !budget.isArchived) {
+            // Archive it
+            return { ...budget, isArchived: true, color: archivedColor, fechaModificacion: new Date().toISOString() };
+        } else if (!shouldBeArchived && budget.isArchived) {
+            // Restore it
+            const usedColors = new Set(budgets.map(b => b.color));
+            const newColor = PREDEFINED_COLORS.find(c => !usedColors.has(c)) || PREDEFINED_COLORS[0];
+            return { ...budget, isArchived: false, isRestored: true, color: newColor, fechaModificacion: new Date().toISOString() };
+        }
+        return budget;
+    });
+};
+
 
 const appReducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
-    case 'SET_DATA':
-      return { ...state, ...action.payload, loading: false };
-    case 'ADD_BUDGET':
-      return { ...state, budgets: [...state.budgets, action.payload], manualBudgetOrder: [...state.manualBudgetOrder, action.payload.id] };
-    case 'UPDATE_BUDGET':
-      return {
-        ...state,
-        budgets: state.budgets.map((b) =>
+    case 'SET_DATA': {
+      const { budgets, expenses } = action.payload;
+      const updatedBudgets = checkAndApplyArchiveStatus(budgets, expenses, state.archivedBudgetColor);
+      return { ...state, budgets: updatedBudgets, expenses, loading: false };
+    }
+    case 'ADD_BUDGET': {
+      const newBudgets = [...state.budgets, action.payload];
+      const updatedBudgets = checkAndApplyArchiveStatus(newBudgets, state.expenses, state.archivedBudgetColor);
+      return { ...state, budgets: updatedBudgets, manualBudgetOrder: [...state.manualBudgetOrder, action.payload.id] };
+    }
+    case 'UPDATE_BUDGET': {
+      const newBudgets = state.budgets.map((b) =>
           b.id === action.payload.id ? action.payload : b
-        ),
-      };
+      );
+      const updatedBudgets = checkAndApplyArchiveStatus(newBudgets, state.expenses, state.archivedBudgetColor);
+      return { ...state, budgets: updatedBudgets };
+    }
     case 'DELETE_BUDGET': {
       const budgetId = action.payload;
+      const newExpenses = state.expenses.filter((e) => e.presupuestoId !== budgetId);
+      const newBudgets = state.budgets.filter((b) => b.id !== budgetId);
+      const updatedBudgets = checkAndApplyArchiveStatus(newBudgets, newExpenses, state.archivedBudgetColor);
+
       return {
         ...state,
-        budgets: state.budgets.filter((b) => b.id !== budgetId),
-        expenses: state.expenses.filter((e) => e.presupuestoId !== budgetId),
+        budgets: updatedBudgets,
+        expenses: newExpenses,
         manualBudgetOrder: state.manualBudgetOrder.filter(id => id !== budgetId),
       };
     }
-    case 'ADD_EXPENSE':
-      return { ...state, expenses: [...state.expenses, action.payload] };
-    case 'UPDATE_EXPENSE':
-      return {
-        ...state,
-        expenses: state.expenses.map((e) =>
+    case 'ADD_EXPENSE': {
+        const newExpenses = [...state.expenses, action.payload];
+        const updatedBudgets = checkAndApplyArchiveStatus(state.budgets, newExpenses, state.archivedBudgetColor);
+        return { ...state, expenses: newExpenses, budgets: updatedBudgets };
+    }
+    case 'UPDATE_EXPENSE': {
+      const newExpenses = state.expenses.map((e) =>
           e.id === action.payload.id ? action.payload : e
-        ),
-      };
+      );
+      const updatedBudgets = checkAndApplyArchiveStatus(state.budgets, newExpenses, state.archivedBudgetColor);
+      return { ...state, expenses: newExpenses, budgets: updatedBudgets };
+    }
     case 'DELETE_EXPENSE': {
       const expenseToDelete = state.expenses.find(e => e.id === action.payload);
+      const newExpenses = state.expenses.filter((e) => e.id !== action.payload);
+      const updatedBudgets = checkAndApplyArchiveStatus(state.budgets, newExpenses, state.archivedBudgetColor);
       return {
         ...state,
-        expenses: state.expenses.filter((e) => e.id !== action.payload),
+        expenses: newExpenses,
+        budgets: updatedBudgets,
         lastDeletedExpense: expenseToDelete || null,
       };
     }
@@ -89,7 +136,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
       if (!state.lastDeletedExpense) return state;
       const newExpenses = [...state.expenses, state.lastDeletedExpense]
         .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-      return { ...state, expenses: newExpenses, lastDeletedExpense: null };
+      const updatedBudgets = checkAndApplyArchiveStatus(state.budgets, newExpenses, state.archivedBudgetColor);
+      return { ...state, expenses: newExpenses, budgets: updatedBudgets, lastDeletedExpense: null };
     }
     case 'SET_THEME':
       return { ...state, theme: action.payload };
@@ -97,34 +145,48 @@ const appReducer = (state: AppState, action: Action): AppState => {
       return { ...state, budgetSortOrder: action.payload };
     case 'SET_EXPENSE_SORT_ORDER':
       return { ...state, expenseSortOrder: action.payload };
-    case 'IMPORT_DATA':
-      return { ...state, budgets: action.payload.budgets, expenses: action.payload.expenses };
+    case 'IMPORT_DATA': {
+        const { budgets, expenses } = action.payload;
+        const updatedBudgets = checkAndApplyArchiveStatus(budgets, expenses, state.archivedBudgetColor);
+        return { ...state, budgets: updatedBudgets, expenses: expenses };
+    }
     case 'ADD_TOAST':
       return { ...state, toasts: [action.payload, ...state.toasts.filter(t => t.onUndo)] }; // Allow only one undo toast
     case 'REMOVE_TOAST':
       return { ...state, toasts: state.toasts.filter(t => t.id !== action.payload) };
     case 'REASSIGN_AND_DELETE_BUDGET': {
       const { sourceBudgetId, targetBudgetId } = action.payload;
+      const newExpenses = state.expenses.map(e =>
+          e.presupuestoId === sourceBudgetId ? { ...e, presupuestoId: targetBudgetId } : e
+      );
+      const newBudgets = state.budgets.filter(b => b.id !== sourceBudgetId);
+      const updatedBudgets = checkAndApplyArchiveStatus(newBudgets, newExpenses, state.archivedBudgetColor);
+
       return {
         ...state,
-        expenses: state.expenses.map(e =>
-          e.presupuestoId === sourceBudgetId ? { ...e, presupuestoId: targetBudgetId } : e
-        ),
-        budgets: state.budgets.filter(b => b.id !== sourceBudgetId),
+        expenses: newExpenses,
+        budgets: updatedBudgets,
         manualBudgetOrder: state.manualBudgetOrder.filter(id => id !== sourceBudgetId),
       };
     }
     case 'MOVE_EXPENSE': {
       const { expenseId, targetBudgetId } = action.payload;
-      return {
-        ...state,
-        expenses: state.expenses.map(e =>
+      const newExpenses = state.expenses.map(e =>
           e.id === expenseId ? { ...e, presupuestoId: targetBudgetId } : e
-        ),
-      };
+      );
+      const updatedBudgets = checkAndApplyArchiveStatus(state.budgets, newExpenses, state.archivedBudgetColor);
+      return { ...state, expenses: newExpenses, budgets: updatedBudgets };
     }
      case 'SET_MANUAL_BUDGET_ORDER':
         return { ...state, manualBudgetOrder: action.payload };
+    case 'SET_ARCHIVED_BUDGET_COLOR':
+        const budgetsWithNewArchiveColor = state.budgets.map(b => {
+            if (b.isArchived) {
+                return { ...b, color: action.payload };
+            }
+            return b;
+        });
+        return { ...state, archivedBudgetColor: action.payload, budgets: budgetsWithNewArchiveColor };
     default:
       return state;
   }
@@ -150,6 +212,7 @@ interface AppContextType extends AppState {
   reassignAndDeleteBudget: (sourceBudgetId: string, targetBudgetId: string) => void;
   moveExpense: (expenseId: string, targetBudgetId: string) => void;
   setManualBudgetOrder: (order: string[]) => void;
+  setArchivedBudgetColor: (color: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -215,6 +278,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     localStorage.setItem('expenseSortOrder', state.expenseSortOrder);
   }, [state.expenseSortOrder]);
 
+  useEffect(() => {
+    localStorage.setItem('archivedBudgetColor', state.archivedBudgetColor);
+  }, [state.archivedBudgetColor]);
+
 
   const getBudgetExpenses = useCallback((budgetId: string) => {
     return state.expenses.filter(expense => expense.presupuestoId === budgetId);
@@ -237,6 +304,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       id: crypto.randomUUID(),
       fechaCreacion: new Date().toISOString(),
       fechaModificacion: new Date().toISOString(),
+      isArchived: false,
+      isRestored: false,
     };
     dispatch({ type: 'ADD_BUDGET', payload: newBudget });
   };
@@ -287,6 +356,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const setManualBudgetOrder = (order: string[]) => {
     dispatch({ type: 'SET_MANUAL_BUDGET_ORDER', payload: order });
   }
+  
+  const setArchivedBudgetColor = (color: string) => {
+    dispatch({ type: 'SET_ARCHIVED_BUDGET_COLOR', payload: color });
+  };
 
   const importData = (data: { budgets: Budget[], expenses: Expense[]}) => {
     dispatch({ type: 'IMPORT_DATA', payload: data });
@@ -310,7 +383,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importData, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder }}>
+    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importData, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder, setArchivedBudgetColor }}>
       {children}
     </AppContext.Provider>
   );

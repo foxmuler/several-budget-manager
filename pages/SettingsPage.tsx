@@ -1,11 +1,12 @@
 
+
 import React, { useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Theme, BudgetSortOrder, ExpenseSortOrder } from '../types';
 import { APP_VERSION, APP_AUTHOR } from '../constants';
 
 const SettingsPage = () => {
-    const { theme, setTheme, budgets, expenses, importData, addToast, budgetSortOrder, setBudgetSortOrder, expenseSortOrder, setExpenseSortOrder } = useAppContext();
+    const { theme, setTheme, budgets, expenses, importData, addToast, budgetSortOrder, setBudgetSortOrder, expenseSortOrder, setExpenseSortOrder, archivedBudgetColor, setArchivedBudgetColor } = useAppContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleExport = () => {
@@ -78,6 +79,20 @@ const SettingsPage = () => {
                             {t === 'light' ? 'Claro' : t === 'dark' ? 'Oscuro' : 'Sistema'}
                         </button>
                     ))}
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 className="text-lg font-semibold mb-3">Apariencia</h2>
+                 <div className="flex items-center justify-between">
+                    <label htmlFor="archivedBudgetColor" className="text-sm font-medium text-gray-700 dark:text-gray-300">Color para capitales archivados</label>
+                    <input 
+                        type="color" 
+                        id="archivedBudgetColor" 
+                        value={archivedBudgetColor}
+                        onChange={(e) => setArchivedBudgetColor(e.target.value)}
+                        className="w-10 h-10 p-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md cursor-pointer"
+                    />
                 </div>
             </div>
 

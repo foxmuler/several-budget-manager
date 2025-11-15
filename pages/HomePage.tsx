@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import DonutChartComponent from '../components/DonutChart';
@@ -10,7 +12,7 @@ import ReassignExpensesModal from '../components/ReassignExpensesModal';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 
 const AddIcon = ({ className }: { className: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
 );
 
 const HomePage = () => {
@@ -22,29 +24,35 @@ const HomePage = () => {
     const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
     const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
     const [draggedId, setDraggedId] = useState<string | null>(null);
+
+    const activeBudgets = useMemo(() => budgets.filter(b => !b.isArchived), [budgets]);
     
     const availableBudgetsForReassign = useMemo(() => {
         if (!budgetToDelete) return [];
-        return budgets.filter(b => b.id !== budgetToDelete.id);
-    }, [budgets, budgetToDelete]);
+        return activeBudgets.filter(b => b.id !== budgetToDelete.id);
+    }, [activeBudgets, budgetToDelete]);
 
     const sortedBudgets = useMemo(() => {
-        const budgetsCopy = [...budgets];
+        const budgetsCopy = [...activeBudgets];
         if (budgetSortOrder === 'manual') {
             const orderMap = new Map(manualBudgetOrder.map((id, index) => [id, index]));
             return budgetsCopy.sort((a, b) => {
                 const indexA = orderMap.get(a.id);
                 const indexB = orderMap.get(b.id);
-                // FIX: Corrected the manual sorting logic to be more robust and prevent a potential TypeScript type error.
-                // This new implementation explicitly handles cases where budgets might not be in the manual order map,
-                // ensuring that subtraction is only performed on numbers.
-                if (indexA === undefined) {
-                    return indexB === undefined ? 0 : 1;
+                
+                // FIX: Corrected manual sorting logic. The original implementation caused a TypeScript error because the compiler
+                // couldn't infer that `indexA` and `indexB` were numbers within the conditional block.
+                // This revised structure allows for correct type narrowing.
+                if (indexA !== undefined && indexB !== undefined) {
+                    return indexA - indexB;
                 }
-                if (indexB === undefined) {
-                    return -1;
+                if (indexA !== undefined) {
+                    return -1; // a is in order, b is not -> a comes first
                 }
-                return indexA - indexB;
+                if (indexB !== undefined) {
+                    return 1; // b is in order, a is not -> b comes first
+                }
+                return 0; // neither are in order -> maintain relative order
             });
         }
         switch (budgetSortOrder) {
@@ -62,14 +70,14 @@ const HomePage = () => {
             default:
                 return budgetsCopy.sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
         }
-    }, [budgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses, manualBudgetOrder]);
+    }, [activeBudgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses, manualBudgetOrder]);
 
 
     const handleDeleteRequest = (budget: Budget) => {
         const expenses = getBudgetExpenses(budget.id);
 
         if (expenses.length > 0) {
-            if (budgets.length > 1) {
+            if (activeBudgets.length > 1) {
                 setBudgetToDelete(budget);
                 setIsReassignModalOpen(true);
             } else {
@@ -209,6 +217,7 @@ const HomePage = () => {
                     isOpen={isReassignModalOpen}
                     onClose={handleCloseReassignModal}
                     onConfirm={handleConfirmReassignment}
+                    budgetToDeleteId={budgetToDelete.id}
                     budgetToDeleteName={budgetToDelete.descripcion}
                     numberOfExpenses={getBudgetExpenses(budgetToDelete.id).length}
                     availableBudgets={availableBudgetsForReassign}

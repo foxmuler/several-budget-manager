@@ -5,7 +5,7 @@ import { Theme, BudgetSortOrder, ExpenseSortOrder } from '../types';
 import { APP_VERSION, APP_AUTHOR } from '../constants';
 
 const SettingsPage = () => {
-    const { theme, setTheme, budgets, expenses, importData, addToast, budgetSortOrder, setBudgetSortOrder, expenseSortOrder, setExpenseSortOrder, zeroBalanceColor, setZeroBalanceColor } = useAppContext();
+    const { theme, setTheme, budgets, expenses, importData, addToast, budgetSortOrder, setBudgetSortOrder, expenseSortOrder, setExpenseSortOrder } = useAppContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleExport = () => {
@@ -63,39 +63,21 @@ const SettingsPage = () => {
             <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Configuración</h1>
             
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg">
-                <h2 className="text-lg font-semibold mb-3">Apariencia</h2>
-                <div className="space-y-4">
-                    <div>
-                        <h3 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Tema</h3>
-                        <div className="flex space-x-2">
-                            {(['light', 'dark', 'system'] as Theme[]).map(t => (
-                                <button 
-                                    key={t}
-                                    onClick={() => setTheme(t)}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${
-                                        theme === t
-                                        ? 'bg-primary-600 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
-                                    }`}
-                                >
-                                    {t === 'light' ? 'Claro' : t === 'dark' ? 'Oscuro' : 'Sistema'}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label htmlFor="zeroBalanceColor" className="block text-md font-medium text-gray-700 dark:text-gray-300">Color para Capitales Agotados</label>
-                        <div className="mt-2 flex items-center gap-3">
-                            <input
-                                type="color"
-                                id="zeroBalanceColor"
-                                value={zeroBalanceColor}
-                                onChange={(e) => setZeroBalanceColor(e.target.value)}
-                                className="p-1 h-10 w-14 block bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 cursor-pointer rounded-lg"
-                            />
-                            <span className="text-sm text-gray-500 dark:text-gray-400">Selecciona el color para capitales con 0€ o menos de restante.</span>
-                        </div>
-                    </div>
+                <h2 className="text-lg font-semibold mb-3">Tema</h2>
+                <div className="flex space-x-2">
+                    {(['light', 'dark', 'system'] as Theme[]).map(t => (
+                        <button 
+                            key={t}
+                            onClick={() => setTheme(t)}
+                            className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${
+                                theme === t
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            }`}
+                        >
+                            {t === 'light' ? 'Claro' : t === 'dark' ? 'Oscuro' : 'Sistema'}
+                        </button>
+                    ))}
                 </div>
             </div>
 

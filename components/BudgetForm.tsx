@@ -10,7 +10,7 @@ interface BudgetFormProps {
 }
 
 const BudgetForm = ({ onSave, budgetToEdit }: BudgetFormProps) => {
-    const { addBudget, updateBudget, budgets, addToast, getBudgetRemaining } = useAppContext();
+    const { addBudget, updateBudget, budgets, addToast } = useAppContext();
     const [formData, setFormData] = useState({
         numeroReferencia: '',
         descripcion: '',
@@ -29,7 +29,7 @@ const BudgetForm = ({ onSave, budgetToEdit }: BudgetFormProps) => {
                 color: budgetToEdit.color,
             });
         } else {
-             const usedColors = new Set(budgets.filter(b => getBudgetRemaining(b.id) > 0).map(b => b.color));
+             const usedColors = new Set(budgets.map(b => b.color));
              const firstAvailableColor = PREDEFINED_COLORS.find(c => !usedColors.has(c));
              setFormData(prev => ({
                  ...prev,
@@ -40,7 +40,7 @@ const BudgetForm = ({ onSave, budgetToEdit }: BudgetFormProps) => {
                  porcentajeUsable: '50',
              }));
         }
-    }, [budgetToEdit, budgets, getBudgetRemaining]);
+    }, [budgetToEdit, budgets]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -63,11 +63,10 @@ const BudgetForm = ({ onSave, budgetToEdit }: BudgetFormProps) => {
         // Uniqueness check for color
         const isDuplicateColor = budgets.some(b => 
             b.color === formData.color && 
-            b.id !== budgetToEdit?.id &&
-            getBudgetRemaining(b.id) > 0
+            b.id !== budgetToEdit?.id
         );
         if (isDuplicateColor) {
-            addToast("Este color ya está en uso por un capital activo. Por favor, elige otro.", 'error');
+            addToast("Este color ya está en uso. Por favor, elige otro.", 'error');
             return;
         }
 
@@ -94,7 +93,7 @@ const BudgetForm = ({ onSave, budgetToEdit }: BudgetFormProps) => {
         onSave();
     };
     
-    const usedColors = new Set(budgets.filter(b => b.id !== budgetToEdit?.id && getBudgetRemaining(b.id) > 0).map(b => b.color));
+    const usedColors = new Set(budgets.filter(b => b.id !== budgetToEdit?.id).map(b => b.color));
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">

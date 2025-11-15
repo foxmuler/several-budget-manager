@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import DonutChartComponent from '../components/DonutChart';
 import BudgetCard from '../components/BudgetCard';
@@ -15,17 +14,13 @@ const AddIcon = ({ className }: { className: string }) => (
 );
 
 const HomePage = () => {
-    const { budgets, loading, getBudgetExpenses, deleteBudget, reassignAndDeleteBudget, addToast, budgetSortOrder, getBudgetRemaining, manualBudgetOrder, setManualBudgetOrder } = useAppContext();
+    const { budgets, loading, getBudgetExpenses, deleteBudget, reassignAndDeleteBudget, addToast, budgetSortOrder, getBudgetRemaining } = useAppContext();
     const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
     const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
     const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
     const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
-
-    const dragItem = useRef<number | null>(null);
-    const dragOverItem = useRef<number | null>(null);
-    const [dragging, setDragging] = useState(false);
     
     const availableBudgetsForReassign = useMemo(() => {
         if (!budgetToDelete) return [];
@@ -34,23 +29,6 @@ const HomePage = () => {
 
     const sortedBudgets = useMemo(() => {
         const budgetsCopy = [...budgets];
-        if (budgetSortOrder === 'manual' && manualBudgetOrder.length > 0) {
-            const orderMap = new Map(manualBudgetOrder.map((id, index) => [id, index]));
-            const presentBudgetsInOrder = budgetsCopy.filter(b => orderMap.has(b.id));
-            const newBudgets = budgetsCopy.filter(b => !orderMap.has(b.id));
-            
-            // FIX: Refactored the sort operation to be more explicit for the TypeScript type checker, resolving an arithmetic operation type error by checking for undefined.
-            presentBudgetsInOrder.sort((a, b) => {
-                const orderA = orderMap.get(a.id);
-                const orderB = orderMap.get(b.id);
-                if (orderA !== undefined && orderB !== undefined) {
-                    return orderA - orderB;
-                }
-                return 0;
-            });
-            return [...presentBudgetsInOrder, ...newBudgets];
-        }
-
         switch (budgetSortOrder) {
             case 'date-asc':
                 return budgetsCopy.sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime());
@@ -66,13 +44,7 @@ const HomePage = () => {
             default:
                 return budgetsCopy.sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
         }
-    }, [budgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses, manualBudgetOrder]);
-
-    const [budgetsForDisplay, setBudgetsForDisplay] = useState(sortedBudgets);
-
-    useEffect(() => {
-        setBudgetsForDisplay(sortedBudgets);
-    }, [sortedBudgets]);
+    }, [budgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses]);
 
 
     const handleDeleteRequest = (budget: Budget) => {
@@ -119,33 +91,6 @@ const HomePage = () => {
         setBudgetToDelete(null);
     };
 
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-        dragItem.current = index;
-        setTimeout(() => {
-            setDragging(true);
-        }, 0);
-    };
-
-    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, index: number) => {
-        if (dragItem.current === null || dragItem.current === index) return;
-        dragOverItem.current = index;
-        const reorderedBudgets = [...budgetsForDisplay];
-        const [draggedItemContent] = reorderedBudgets.splice(dragItem.current, 1);
-        reorderedBudgets.splice(dragOverItem.current, 0, draggedItemContent);
-        dragItem.current = index;
-        setBudgetsForDisplay(reorderedBudgets);
-    };
-    
-    const handleDragEnd = () => {
-        if (dragItem.current !== null) {
-            const newOrderIds = budgetsForDisplay.map(b => b.id);
-            setManualBudgetOrder(newOrderIds);
-        }
-        dragItem.current = null;
-        dragOverItem.current = null;
-        setDragging(false);
-    };
-
     if (loading) {
         return <div className="text-center p-8">Cargando datos...</div>;
     }
@@ -155,19 +100,9 @@ const HomePage = () => {
             <DonutChartComponent />
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {budgetsForDisplay.length > 0 ? (
-                    budgetsForDisplay.map((budget, index) => (
-                        <div
-                            key={budget.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, index)}
-                            onDragEnter={(e) => handleDragEnter(e, index)}
-                            onDragEnd={handleDragEnd}
-                            onDragOver={(e) => e.preventDefault()}
-                            className={dragging && dragItem.current === index ? 'dragging-item' : ''}
-                        >
-                             <BudgetCard budget={budget} onDeleteRequest={handleDeleteRequest} />
-                        </div>
+                {sortedBudgets.length > 0 ? (
+                    sortedBudgets.map(budget => (
+                        <BudgetCard key={budget.id} budget={budget} onDeleteRequest={handleDeleteRequest} />
                     ))
                 ) : (
                     <div className="col-span-full text-center py-10 px-4 bg-white dark:bg-gray-800 rounded-lg shadow">

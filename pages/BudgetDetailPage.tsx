@@ -24,7 +24,7 @@ const AddIcon = ({ className }: { className: string }) => (
 // FIX: Removed explicit ReactElement return type to allow TypeScript to correctly infer the component's type.
 const BudgetDetailPage = () => {
     const { id } = useParams<{ id: string }>();
-    const { budgets, getBudgetExpenses, getBudgetRemaining, deleteBudget, addToast, reassignAndDeleteBudget, deleteExpense, moveExpense, getBudgetEffectiveColor } = useAppContext();
+    const { budgets, getBudgetExpenses, getBudgetRemaining, deleteBudget, addToast, reassignAndDeleteBudget, deleteExpense, moveExpense } = useAppContext();
 
     const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
     const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
@@ -49,7 +49,6 @@ const BudgetDetailPage = () => {
         );
     }
     
-    const effectiveColor = getBudgetEffectiveColor(budget);
     const initialAvailable = (budget.capitalTotal * budget.porcentajeUsable) / 100;
     const spent = initialAvailable - remaining;
     const spentPercentage = initialAvailable > 0 ? (spent / initialAvailable) * 100 : 0;
@@ -132,10 +131,10 @@ const BudgetDetailPage = () => {
                 <div className="mt-6 space-y-4">
                     <div className="flex justify-between items-baseline">
                         <span className="text-gray-600 dark:text-gray-300">Restante:</span>
-                        <span className="text-2xl font-semibold" style={{color: effectiveColor}}>{remaining.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
+                        <span className="text-2xl font-semibold" style={{color: budget.color}}>{remaining.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                        <div className="h-2.5 rounded-full" style={{ width: `${spentPercentage}%`, backgroundColor: effectiveColor }}></div>
+                        <div className="h-2.5 rounded-full" style={{ width: `${spentPercentage}%`, backgroundColor: budget.color }}></div>
                     </div>
                     <div className="text-sm flex justify-between text-gray-500 dark:text-gray-400">
                         <span>Gastado: {spent.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span>

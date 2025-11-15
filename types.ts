@@ -31,7 +31,6 @@ export interface ToastMessage {
 }
 
 export type BudgetSortOrder =
-  | 'manual'
   | 'date-desc'
   | 'date-asc'
   | 'remaining-desc'

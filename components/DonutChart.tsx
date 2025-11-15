@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useAppContext } from '../context/AppContext';
@@ -25,7 +24,7 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, outerRadius, remainingPercent
 
 
 const DonutChartComponent = () => {
-    const { budgets, getBudgetRemaining, getBudgetEffectiveColor } = useAppContext();
+    const { budgets, getBudgetRemaining } = useAppContext();
 
     const data = budgets.map(budget => {
         const remaining = getBudgetRemaining(budget.id);
@@ -36,7 +35,7 @@ const DonutChartComponent = () => {
             id: budget.id,
             name: budget.descripcion,
             value: budget.capitalTotal,
-            color: getBudgetEffectiveColor(budget),
+            color: budget.color,
             remainingPercentage,
         };
     });

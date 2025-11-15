@@ -7,4 +7,3 @@ export const PREDEFINED_COLORS = [
 
 export const APP_VERSION = '1.0.0';
 export const APP_AUTHOR = 'SySmcn ©';
-export const DEFAULT_ZERO_BALANCE_COLOR = '#6b7280';

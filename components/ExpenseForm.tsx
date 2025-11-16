@@ -39,6 +39,16 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
         }
     }, [budgets, budgetSortOrder, getBudgetRemaining, getBudgetExpenses]);
 
+    const availableBudgetsForForm = useMemo(() => {
+        return sortedBudgets.filter(b => {
+            if (expenseToEdit && b.id === expenseToEdit.presupuestoId) {
+                return true;
+            }
+            return getBudgetRemaining(b.id) > 0;
+        });
+    }, [sortedBudgets, getBudgetRemaining, expenseToEdit]);
+
+
     const [formData, setFormData] = useState({
         numeroRefGasto: '',
         descripcion: '',
@@ -57,14 +67,12 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 presupuestoId: expenseToEdit.presupuestoId,
             });
         } else {
-             // For new expenses, set the default budget based on the sorted list.
-             // This also handles the case where budgets load asynchronously.
             setFormData(prev => ({
-                ...prev, // Keep scanned data if any
-                presupuestoId: defaultBudgetId || (sortedBudgets.length > 0 ? sortedBudgets[0].id : ''),
+                ...prev,
+                presupuestoId: defaultBudgetId || (availableBudgetsForForm.length > 0 ? availableBudgetsForForm[0].id : ''),
             }));
         }
-    }, [expenseToEdit, sortedBudgets, defaultBudgetId]);
+    }, [expenseToEdit, availableBudgetsForForm, defaultBudgetId]);
 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -147,7 +155,7 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 <div>
                     <label htmlFor="presupuestoId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asociar a Capital</label>
                     <select id="presupuestoId" name="presupuestoId" value={formData.presupuestoId} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500">
-                        {sortedBudgets.map(b => (
+                        {availableBudgetsForForm.map(b => (
                             <option key={b.id} value={b.id}>
                                 {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
                             </option>

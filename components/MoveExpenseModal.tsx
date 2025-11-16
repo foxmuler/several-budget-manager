@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { Budget, Expense } from '../types';
 import Modal from './ui/Modal';
 import { useAppContext } from '../context/AppContext';
@@ -16,13 +17,17 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
     const { addToast, getBudgetRemaining } = useAppContext();
     const [targetBudgetId, setTargetBudgetId] = useState<string>('');
 
+    const budgetsWithPositiveBalance = useMemo(() => {
+        return availableBudgets.filter(b => getBudgetRemaining(b.id) > 0);
+    }, [availableBudgets, getBudgetRemaining]);
+
     useEffect(() => {
-        if (availableBudgets.length > 0) {
-            setTargetBudgetId(availableBudgets[0].id);
+        if (budgetsWithPositiveBalance.length > 0) {
+            setTargetBudgetId(budgetsWithPositiveBalance[0].id);
         } else {
             setTargetBudgetId('');
         }
-    }, [availableBudgets, isOpen]);
+    }, [budgetsWithPositiveBalance, isOpen]);
 
     const handleConfirm = () => {
         if (!targetBudgetId) {
@@ -51,7 +56,7 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                     &nbsp;de <span className="font-bold">{expenseToMove.importe.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span> a un nuevo capital.
                 </p>
                 
-                {availableBudgets.length > 0 ? (
+                {budgetsWithPositiveBalance.length > 0 ? (
                     <div>
                          <label htmlFor="targetBudgetMove" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nuevo capital de destino:</label>
                         <select 
@@ -60,14 +65,16 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                             onChange={(e) => setTargetBudgetId(e.target.value)}
                             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
                         >
-                           {availableBudgets.map(b => (
-                               <option key={b.id} value={b.id}>{b.descripcion}</option>
+                           {budgetsWithPositiveBalance.map(b => (
+                               <option key={b.id} value={b.id}>
+                                   {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
+                                </option>
                            ))}
                         </select>
                     </div>
                 ) : (
                     <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                        No hay otros capitales disponibles para mover el gasto.
+                        No hay otros capitales con saldo positivo disponibles para mover el gasto.
                     </p>
                 )}
                 
@@ -82,7 +89,7 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                     <button 
                         onClick={handleConfirm}
                         type="button" 
-                        disabled={availableBudgets.length === 0}
+                        disabled={budgetsWithPositiveBalance.length === 0}
                         className="inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         Mover

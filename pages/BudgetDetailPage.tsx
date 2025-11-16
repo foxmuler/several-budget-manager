@@ -25,7 +25,7 @@ const AddIcon = ({ className }: { className: string }) => (
 // FIX: Removed explicit ReactElement return type to allow TypeScript to correctly infer the component's type.
 const BudgetDetailPage = () => {
     const { id } = useParams<{ id: string }>();
-    const { budgets, getBudgetExpenses, getBudgetRemaining, deleteBudget, addToast, reassignAndDeleteBudget, deleteExpense, moveExpense } = useAppContext();
+    const { budgets, getBudgetExpenses, getBudgetRemaining, deleteBudget, addToast, reassignAndDeleteBudget, deleteExpense, moveExpense, expenseSortOrder } = useAppContext();
 
     const [isEditBudgetModalOpen, setIsEditBudgetModalOpen] = useState(false);
     const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
@@ -39,6 +39,26 @@ const BudgetDetailPage = () => {
     const remaining = useMemo(() => id ? getBudgetRemaining(id) : 0, [id, getBudgetRemaining]);
     const availableBudgetsForReassign = useMemo(() => budgets.filter(b => b.id !== id), [budgets, id]);
     const availableBudgetsForMove = useMemo(() => budgets.filter(b => b.id !== id), [budgets, id]);
+    
+    const sortedExpenses = useMemo(() => {
+        return [...expenses].sort((a, b) => {
+            switch (expenseSortOrder) {
+                case 'date-asc':
+                    return new Date(a.fecha).getTime() - new Date(b.fecha).getTime();
+                case 'amount-desc':
+                    return b.importe - a.importe;
+                case 'amount-asc':
+                    return a.importe - b.importe;
+                case 'description-asc':
+                    return a.descripcion.localeCompare(b.descripcion);
+                case 'description-desc':
+                    return b.descripcion.localeCompare(a.descripcion);
+                case 'date-desc':
+                default:
+                    return new Date(b.fecha).getTime() - new Date(a.fecha).getTime();
+            }
+        });
+    }, [expenses, expenseSortOrder]);
 
 
     if (!budget) {
@@ -153,9 +173,9 @@ const BudgetDetailPage = () => {
                     </button>
                 </div>
                 <div className="space-y-3">
-                    {expenses.length > 0 ? (
-                        expenses.sort((a,b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map(expense => (
-                            <ExpenseListItem key={expense.id} expense={expense} onEdit={() => handleEditExpense(expense)} onDelete={handleDeleteExpense} onMoveRequest={handleMoveRequest} />
+                    {sortedExpenses.length > 0 ? (
+                        sortedExpenses.map(expense => (
+                            <ExpenseListItem key={expense.id} expense={expense} showBudgetInfo onEdit={() => handleEditExpense(expense)} onDelete={handleDeleteExpense} onMoveRequest={handleMoveRequest} />
                         ))
                     ) : (
                         <p className="text-center text-gray-500 dark:text-gray-400 py-4">No hay gastos en este capital.</p>

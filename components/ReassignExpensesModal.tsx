@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Budget } from '../types';
 import Modal from './ui/Modal';
@@ -58,7 +57,9 @@ const ReassignExpensesModal = ({ isOpen, onClose, onConfirm, budgetToDeleteId, b
                         className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
                     >
                        {availableBudgets.map(b => (
-                           <option key={b.id} value={b.id}>{b.descripcion}</option>
+                           <option key={b.id} value={b.id}>
+                               {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
+                           </option>
                        ))}
                     </select>
                 </div>

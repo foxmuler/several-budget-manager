@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Expense, AutoDistributionStrategy } from '../types';
+import { Expense } from '../types';
 import { useAppContext } from '../context/AppContext';
 import CameraScannerModal from './ui/CameraScannerModal';
 import { OcrData } from '../services/gemini';
@@ -13,7 +13,7 @@ interface ExpenseFormProps {
 }
 
 const CameraIcon = ({ className }: { className: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h4.05l1.83-2h4.24l1.83 2H20v12zM12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h4.05l1.83-2h4.24l1.83 2H20v12zM12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
 );
 
 
@@ -55,7 +55,10 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
         importe: '0',
         presupuestoId: defaultBudgetId || '',
     });
-    const [selectedStrategy, setSelectedStrategy] = useState<AutoDistributionStrategy>(defaultStrategy);
+    
+    // Fallback to manual if conflict or editing
+    const [forceManualMode, setForceManualMode] = useState(false);
+    
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
 
@@ -67,26 +70,21 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 importe: String(expenseToEdit.importe),
                 presupuestoId: expenseToEdit.presupuestoId,
             });
-            // When editing, typically we start in Manual mode to show the current budget
-            setSelectedStrategy('manual');
+            // Force manual when editing to allow changing budget explicitly
+            setForceManualMode(true);
         } else {
             setFormData(prev => ({
                 ...prev,
                 presupuestoId: defaultBudgetId || (availableBudgetsForForm.length > 0 ? availableBudgetsForForm[0].id : ''),
             }));
-            // Use global default strategy
-            setSelectedStrategy(defaultStrategy);
+            setForceManualMode(false);
         }
-    }, [expenseToEdit, availableBudgetsForForm, defaultBudgetId, defaultStrategy]);
+    }, [expenseToEdit, availableBudgetsForForm, defaultBudgetId]);
 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-    };
-    
-    const handleStrategyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setSelectedStrategy(e.target.value as AutoDistributionStrategy);
     };
 
     const handleScanSuccess = (data: OcrData) => {
@@ -117,17 +115,20 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
             return;
         }
 
-        // Determine Target Budget ID
+        // Determine Target Budget ID based on strategy
         let targetBudgetId = formData.presupuestoId;
         
-        if (selectedStrategy !== 'manual') {
-            const autoId = findAutoBudget(amount, selectedStrategy);
+        // Check which strategy to use: global default or forced manual
+        const effectiveStrategy = forceManualMode ? 'manual' : defaultStrategy;
+        
+        if (effectiveStrategy !== 'manual') {
+            const autoId = findAutoBudget(amount, effectiveStrategy);
             if (autoId) {
                 targetBudgetId = autoId;
             } else {
                 // Fallback to manual if auto strategy fails
-                addToast(`Conflicto: La estrategia "${selectedStrategy}" no encontró un capital válido. Por favor, selecciona manualmente.`, 'error');
-                setSelectedStrategy('manual');
+                addToast(`Conflicto: La estrategia "${effectiveStrategy}" no encontró un capital válido. Por favor, selecciona manualmente.`, 'error');
+                setForceManualMode(true); // Enable dropdown
                 return;
             }
         }
@@ -181,25 +182,12 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
         onSave();
     };
     
+    const isAutoMode = defaultStrategy !== 'manual' && !forceManualMode;
+
     return (
         <>
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                     <label htmlFor="distributionStrategy" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-repartición de Capital</label>
-                    <select 
-                        id="distributionStrategy" 
-                        value={selectedStrategy} 
-                        onChange={handleStrategyChange} 
-                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-                    >
-                        <option value="manual">Capital Manual</option>
-                        <option value="best-fit">Capital ajustado al gasto</option>
-                        <option value="largest-available">Último Capital Grande</option>
-                        <option value="newest">Último capital introducido</option>
-                        <option value="oldest">Capital más antiguo</option>
-                        <option value="random">Capital Auto (Rotación)</option>
-                    </select>
-                </div>
+                {/* Strategy dropdown removed - using global setting */}
 
                 <div>
                     <label htmlFor="presupuestoId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asociar a Capital</label>
@@ -209,7 +197,7 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                         value={formData.presupuestoId} 
                         onChange={handleChange} 
                         required 
-                        disabled={selectedStrategy !== 'manual'}
+                        disabled={isAutoMode}
                         className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-500"
                     >
                         {availableBudgetsForForm.map(b => (
@@ -218,13 +206,13 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                             </option>
                         ))}
                     </select>
-                    {selectedStrategy !== 'manual' && (
+                    {isAutoMode && (
                          <p className="mt-2 text-center text-sm font-bold text-orange-500 dark:text-orange-400">
                             El capital será seleccionado automáticamente: {
-                                selectedStrategy === 'best-fit' ? 'Ajustado al gasto' :
-                                selectedStrategy === 'largest-available' ? 'Último Capital Grande' :
-                                selectedStrategy === 'newest' ? 'Último capital introducido' :
-                                selectedStrategy === 'oldest' ? 'Capital más antiguo' : 'Capital Auto'
+                                defaultStrategy === 'best-fit' ? 'Ajustado al gasto' :
+                                defaultStrategy === 'largest-available' ? 'Último Capital Grande' :
+                                defaultStrategy === 'newest' ? 'Último capital introducido' :
+                                defaultStrategy === 'oldest' ? 'Capital más antiguo' : 'Capital Auto'
                             }
                         </p>
                     )}

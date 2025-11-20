@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Budget, Expense, AutoDistributionStrategy } from '../types';
+import { Budget, Expense } from '../types';
 import Modal from './ui/Modal';
 import { useAppContext } from '../context/AppContext';
 
@@ -16,7 +16,7 @@ interface MoveExpenseModalProps {
 const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, availableBudgets }: MoveExpenseModalProps) => {
     const { addToast, getBudgetRemaining, findAutoBudget, autoDistributionStrategy: defaultStrategy } = useAppContext();
     const [targetBudgetId, setTargetBudgetId] = useState<string>('');
-    const [selectedStrategy, setSelectedStrategy] = useState<AutoDistributionStrategy>(defaultStrategy);
+    const [forceManualMode, setForceManualMode] = useState(false);
 
     const budgetsWithPositiveBalance = useMemo(() => {
         return availableBudgets.filter(b => getBudgetRemaining(b.id) > 0);
@@ -28,24 +28,22 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
         } else {
             setTargetBudgetId('');
         }
-        // Initialize with global preference when opening
-        setSelectedStrategy(defaultStrategy);
-    }, [budgetsWithPositiveBalance, isOpen, defaultStrategy]);
+        // Reset force manual mode when opening modal
+        setForceManualMode(false);
+    }, [budgetsWithPositiveBalance, isOpen]);
 
-    const handleStrategyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setSelectedStrategy(e.target.value as AutoDistributionStrategy);
-    };
 
     const handleConfirm = () => {
         let finalTargetId = targetBudgetId;
+        const effectiveStrategy = forceManualMode ? 'manual' : defaultStrategy;
 
-        if (selectedStrategy !== 'manual' && expenseToMove) {
-             const autoId = findAutoBudget(expenseToMove.importe, selectedStrategy, expenseToMove.presupuestoId);
+        if (effectiveStrategy !== 'manual' && expenseToMove) {
+             const autoId = findAutoBudget(expenseToMove.importe, effectiveStrategy, expenseToMove.presupuestoId);
              if (autoId) {
                  finalTargetId = autoId;
              } else {
-                 addToast(`Conflicto: La estrategia "${selectedStrategy}" no encontró un capital válido. Por favor, selecciona manualmente.`, 'error');
-                 setSelectedStrategy('manual');
+                 addToast(`Conflicto: La estrategia "${effectiveStrategy}" no encontró un capital válido. Por favor, selecciona manualmente.`, 'error');
+                 setForceManualMode(true);
                  return;
              }
         }
@@ -68,6 +66,8 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
     };
     
     if (!expenseToMove) return null;
+    
+    const isAutoMode = defaultStrategy !== 'manual' && !forceManualMode;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Mover Gasto">
@@ -77,22 +77,7 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                     &nbsp;de <span className="font-bold">{expenseToMove.importe.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span> a un nuevo capital.
                 </p>
 
-                 <div>
-                     <label htmlFor="moveStrategy" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-repartición de Capital</label>
-                    <select 
-                        id="moveStrategy" 
-                        value={selectedStrategy} 
-                        onChange={handleStrategyChange} 
-                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
-                    >
-                        <option value="manual">Capital Manual</option>
-                        <option value="best-fit">Capital ajustado al gasto</option>
-                        <option value="largest-available">Último Capital Grande</option>
-                        <option value="newest">Último capital introducido</option>
-                        <option value="oldest">Capital más antiguo</option>
-                        <option value="random">Capital Auto (Rotación)</option>
-                    </select>
-                </div>
+                {/* Strategy dropdown removed - using global setting */}
                 
                 <div>
                      <label htmlFor="targetBudgetMove" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nuevo capital de destino:</label>
@@ -100,7 +85,7 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                         id="targetBudgetMove" 
                         value={targetBudgetId}
                         onChange={(e) => setTargetBudgetId(e.target.value)}
-                        disabled={selectedStrategy !== 'manual'}
+                        disabled={isAutoMode}
                         className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-500"
                     >
                        {budgetsWithPositiveBalance.map(b => (
@@ -109,17 +94,18 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                             </option>
                        ))}
                     </select>
-                    {selectedStrategy !== 'manual' && (
+                    {isAutoMode && (
                          <p className="mt-2 text-center text-sm font-bold text-orange-500 dark:text-orange-400">
                             El capital será seleccionado automáticamente: {
-                                selectedStrategy === 'best-fit' ? 'Ajustado al gasto' :
-                                selectedStrategy === 'largest-available' ? 'Último Capital Grande' :
-                                selectedStrategy === 'newest' ? 'Último capital introducido' :
-                                selectedStrategy === 'oldest' ? 'Capital más antiguo' : 'Capital Auto'
+                                defaultStrategy === 'best-fit' ? 'Ajustado al gasto' :
+                                defaultStrategy === 'largest-available' ? 'Último Capital Grande' :
+                                defaultStrategy === 'newest' ? 'Último capital introducido' :
+                                defaultStrategy === 'oldest' ? 'Capital más antiguo' : 'Capital Auto'
                             }
                         </p>
                     )}
-                    {selectedStrategy === 'manual' && budgetsWithPositiveBalance.length === 0 && (
+                    {/* Logic for manual feedback when no budgets */}
+                    {!isAutoMode && budgetsWithPositiveBalance.length === 0 && (
                         <p className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
                             No hay otros capitales con saldo positivo disponibles para mover el gasto.
                         </p>
@@ -137,7 +123,7 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                     <button 
                         onClick={handleConfirm}
                         type="button" 
-                        disabled={selectedStrategy === 'manual' && budgetsWithPositiveBalance.length === 0}
+                        disabled={!isAutoMode && budgetsWithPositiveBalance.length === 0}
                         className="inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                         Mover

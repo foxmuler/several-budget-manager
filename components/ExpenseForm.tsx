@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Expense } from '../types';
+import { Expense, AutoDistributionStrategy } from '../types';
 import { useAppContext } from '../context/AppContext';
 import CameraScannerModal from './ui/CameraScannerModal';
 import { OcrData } from '../services/gemini';
@@ -18,7 +18,7 @@ const CameraIcon = ({ className }: { className: string }) => (
 
 
 const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProps) => {
-    const { budgets, addExpense, updateExpense, getBudgetRemaining, expenses, addToast, budgetSortOrder, getBudgetExpenses } = useAppContext();
+    const { budgets, addExpense, updateExpense, getBudgetRemaining, expenses, addToast, budgetSortOrder, getBudgetExpenses, autoDistributionStrategy: defaultStrategy, findAutoBudget } = useAppContext();
 
     const sortedBudgets = useMemo(() => {
         const budgetsCopy = [...budgets];
@@ -55,6 +55,7 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
         importe: '0',
         presupuestoId: defaultBudgetId || '',
     });
+    const [selectedStrategy, setSelectedStrategy] = useState<AutoDistributionStrategy>(defaultStrategy);
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
 
@@ -66,18 +67,26 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 importe: String(expenseToEdit.importe),
                 presupuestoId: expenseToEdit.presupuestoId,
             });
+            // When editing, typically we start in Manual mode to show the current budget
+            setSelectedStrategy('manual');
         } else {
             setFormData(prev => ({
                 ...prev,
                 presupuestoId: defaultBudgetId || (availableBudgetsForForm.length > 0 ? availableBudgetsForForm[0].id : ''),
             }));
+            // Use global default strategy
+            setSelectedStrategy(defaultStrategy);
         }
-    }, [expenseToEdit, availableBudgetsForForm, defaultBudgetId]);
+    }, [expenseToEdit, availableBudgetsForForm, defaultBudgetId, defaultStrategy]);
 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+    
+    const handleStrategyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setSelectedStrategy(e.target.value as AutoDistributionStrategy);
     };
 
     const handleScanSuccess = (data: OcrData) => {
@@ -91,6 +100,12 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        const amount = parseFloat(formData.importe) || 0;
+        if (amount <= 0 || !formData.descripcion || !formData.numeroRefGasto) {
+             addToast("Por favor, completa todos los campos requeridos.", 'error');
+            return;
+        }
 
         // Uniqueness check for numeroRefGasto
         const isDuplicateRef = expenses.some(exp => 
@@ -102,17 +117,34 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
             return;
         }
 
+        // Determine Target Budget ID
+        let targetBudgetId = formData.presupuestoId;
+        
+        if (selectedStrategy !== 'manual') {
+            const autoId = findAutoBudget(amount, selectedStrategy);
+            if (autoId) {
+                targetBudgetId = autoId;
+            } else {
+                // Fallback to manual if auto strategy fails
+                addToast(`Conflicto: La estrategia "${selectedStrategy}" no encontró un capital válido. Por favor, selecciona manualmente.`, 'error');
+                setSelectedStrategy('manual');
+                return;
+            }
+        }
+
+        if (!targetBudgetId) {
+             addToast("Por favor, selecciona un capital.", 'error');
+             return;
+        }
+
+
         const expenseData = {
             numeroRefGasto: formData.numeroRefGasto,
             descripcion: formData.descripcion,
-            importe: parseFloat(formData.importe) || 0,
-            presupuestoId: formData.presupuestoId,
+            importe: amount,
+            presupuestoId: targetBudgetId,
         };
 
-        if (expenseData.importe <= 0 || !expenseData.descripcion || !expenseData.numeroRefGasto || !expenseData.presupuestoId) {
-             addToast("Por favor, completa todos los campos requeridos.", 'error');
-            return;
-        }
 
         const targetBudgetRemaining = getBudgetRemaining(expenseData.presupuestoId);
         const formatCurrency = (amount: number) => amount.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
@@ -153,15 +185,43 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
         <>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label htmlFor="presupuestoId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asociar a Capital</label>
-                    <select id="presupuestoId" name="presupuestoId" value={formData.presupuestoId} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500">
-                        {availableBudgetsForForm.map(b => (
-                            <option key={b.id} value={b.id}>
-                                {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
-                            </option>
-                        ))}
+                     <label htmlFor="distributionStrategy" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto-repartición de Capital</label>
+                    <select 
+                        id="distributionStrategy" 
+                        value={selectedStrategy} 
+                        onChange={handleStrategyChange} 
+                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500"
+                    >
+                        <option value="manual">Capital Manual</option>
+                        <option value="best-fit">Capital ajustado al gasto</option>
+                        <option value="largest-available">Último Capital Grande</option>
+                        <option value="newest">Último capital introducido</option>
+                        <option value="oldest">Capital más antiguo</option>
+                        <option value="random">Capital Auto (Rotación)</option>
                     </select>
                 </div>
+
+                {selectedStrategy === 'manual' ? (
+                    <div>
+                        <label htmlFor="presupuestoId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asociar a Capital</label>
+                        <select id="presupuestoId" name="presupuestoId" value={formData.presupuestoId} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500">
+                            {availableBudgetsForForm.map(b => (
+                                <option key={b.id} value={b.id}>
+                                    {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                ) : (
+                     <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md text-center text-sm text-gray-600 dark:text-gray-300">
+                        El capital será seleccionado automáticamente al guardar según la estrategia: <strong>{
+                            selectedStrategy === 'best-fit' ? 'Ajustado al gasto' :
+                            selectedStrategy === 'largest-available' ? 'Último Capital Grande' :
+                            selectedStrategy === 'newest' ? 'Último introducido' :
+                            selectedStrategy === 'oldest' ? 'Más antiguo' : 'Auto/Aleatorio'
+                        }</strong>
+                    </div>
+                )}
 
                 <div className="pt-2">
                     <button
@@ -177,7 +237,7 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                 
                 <div className="relative flex items-center pt-2">
                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
-                    <span className="flex-shrink mx-4 text-gray-500 dark:text-gray-400 text-sm">O rellenar manually</span>
+                    <span className="flex-shrink mx-4 text-gray-500 dark:text-gray-400 text-sm">O rellenar manualmente</span>
                     <div className="flex-grow border-t border-gray-300 dark:border-gray-600"></div>
                 </div>
 

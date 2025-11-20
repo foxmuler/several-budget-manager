@@ -49,12 +49,21 @@ export type ExpenseSortOrder =
   | 'amount-asc'
   | 'description-asc'
   | 'description-desc';
+
+export type AutoDistributionStrategy = 
+  | 'manual' 
+  | 'best-fit' 
+  | 'largest-available' 
+  | 'newest' 
+  | 'oldest' 
+  | 'random';
   
 export interface AppConfig {
   theme: Theme;
   budgetSortOrder: BudgetSortOrder;
   expenseSortOrder: ExpenseSortOrder;
   archivedBudgetColor: string;
+  autoDistributionStrategy: AutoDistributionStrategy;
 }
 
 export interface AppData {

@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Theme, BudgetSortOrder, ExpenseSortOrder, AppConfig, AppData } from '../types';
+import { Theme, BudgetSortOrder, ExpenseSortOrder, AppConfig, AppData, AutoDistributionStrategy } from '../types';
 import { APP_VERSION } from '../constants';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 
@@ -12,6 +12,7 @@ const SettingsPage = () => {
         budgetSortOrder, setBudgetSortOrder, 
         expenseSortOrder, setExpenseSortOrder, 
         archivedBudgetColor, setArchivedBudgetColor,
+        autoDistributionStrategy, setAutoDistributionStrategy,
         manualBudgetOrder, importFullBackup, resetApp
     } = useAppContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -33,6 +34,7 @@ const SettingsPage = () => {
                 budgetSortOrder,
                 expenseSortOrder,
                 archivedBudgetColor,
+                autoDistributionStrategy,
             }
         };
         const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
@@ -85,7 +87,7 @@ const SettingsPage = () => {
                         dataToImport = data;
                         const backupVersion = meta.version;
                         const currentVersion = APP_VERSION;
-                        const KNOWN_CONFIG_KEYS_CURRENT = ['theme', 'budgetSortOrder', 'expenseSortOrder', 'archivedBudgetColor'];
+                        const KNOWN_CONFIG_KEYS_CURRENT = ['theme', 'budgetSortOrder', 'expenseSortOrder', 'archivedBudgetColor', 'autoDistributionStrategy'];
                         
                         let finalConfig: Partial<AppConfig> = {};
 
@@ -217,6 +219,27 @@ const SettingsPage = () => {
                         <option value="amount-asc">Importe (menor a mayor)</option>
                         <option value="description-asc">Descripción (A-Z)</option>
                         <option value="description-desc">Descripción (Z-A)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 className="text-lg font-semibold mb-3">Auto-repartición de Capital</h2>
+                <div>
+                    <label htmlFor="autoDistributionStrategy" className="sr-only">Estrategia de reparto</label>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Opción por defecto al crear o mover gastos.</p>
+                    <select 
+                        id="autoDistributionStrategy" 
+                        value={autoDistributionStrategy}
+                        onChange={(e) => setAutoDistributionStrategy(e.target.value as AutoDistributionStrategy)}
+                        className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="manual">Capital Manual (Por defecto)</option>
+                        <option value="best-fit">Capital ajustado al gasto</option>
+                        <option value="largest-available">Último Capital Grande</option>
+                        <option value="newest">Último capital introducido</option>
+                        <option value="oldest">Capital más antiguo</option>
+                        <option value="random">Capital Auto (Rotación/Aleatorio)</option>
                     </select>
                 </div>
             </div>

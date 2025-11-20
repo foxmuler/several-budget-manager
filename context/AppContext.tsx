@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useReducer, ReactNode, useCallback, ReactElement } from 'react';
-import { Budget, Expense, Theme, ToastMessage, ToastType, BudgetSortOrder, ExpenseSortOrder, AppData, AppConfig } from '../types';
+import { Budget, Expense, Theme, ToastMessage, ToastType, BudgetSortOrder, ExpenseSortOrder, AppData, AppConfig, AutoDistributionStrategy } from '../types';
 import * as storage from '../services/storage';
 import { PREDEFINED_COLORS, DEFAULT_ARCHIVED_COLOR } from '../constants';
 
@@ -14,6 +14,7 @@ interface AppState {
   expenseSortOrder: ExpenseSortOrder;
   manualBudgetOrder: string[];
   archivedBudgetColor: string;
+  autoDistributionStrategy: AutoDistributionStrategy;
 }
 
 type Action =
@@ -34,6 +35,7 @@ type Action =
   | { type: 'SET_EXPENSE_SORT_ORDER'; payload: ExpenseSortOrder }
   | { type: 'SET_MANUAL_BUDGET_ORDER'; payload: string[] }
   | { type: 'SET_ARCHIVED_BUDGET_COLOR', payload: string }
+  | { type: 'SET_AUTO_DISTRIBUTION_STRATEGY', payload: AutoDistributionStrategy }
   | { type: 'IMPORT_FULL_BACKUP'; payload: { data: AppData, config: Partial<AppConfig> } };
 
 
@@ -48,6 +50,7 @@ const initialState: AppState = {
   expenseSortOrder: (localStorage.getItem('expenseSortOrder') as ExpenseSortOrder) || 'date-desc',
   manualBudgetOrder: [],
   archivedBudgetColor: localStorage.getItem('archivedBudgetColor') || DEFAULT_ARCHIVED_COLOR,
+  autoDistributionStrategy: (localStorage.getItem('autoDistributionStrategy') as AutoDistributionStrategy) || 'manual',
 };
 
 const checkAndApplyArchiveStatus = (
@@ -182,6 +185,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return b;
         });
         return { ...state, archivedBudgetColor: action.payload, budgets: budgetsWithNewArchiveColor };
+    case 'SET_AUTO_DISTRIBUTION_STRATEGY':
+        return { ...state, autoDistributionStrategy: action.payload };
     case 'IMPORT_FULL_BACKUP': {
         const { data, config } = action.payload;
         const { budgets, expenses, manualBudgetOrder } = data;
@@ -208,6 +213,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
             budgetSortOrder: config.budgetSortOrder || state.budgetSortOrder,
             expenseSortOrder: config.expenseSortOrder || state.expenseSortOrder,
             archivedBudgetColor: finalArchivedColor,
+            autoDistributionStrategy: config.autoDistributionStrategy || state.autoDistributionStrategy,
         };
     }
     default:
@@ -219,6 +225,7 @@ interface AppContextType extends AppState {
   dispatch: React.Dispatch<Action>;
   getBudgetExpenses: (budgetId: string) => Expense[];
   getBudgetRemaining: (budgetId: string) => number;
+  findAutoBudget: (amount: number, strategy: AutoDistributionStrategy, excludeBudgetId?: string) => string | null;
   addBudget: (budget: Omit<Budget, 'id' | 'fechaCreacion' | 'fechaModificacion'>) => void;
   updateBudget: (budget: Budget) => void;
   deleteBudget: (budgetId: string) => void;
@@ -236,6 +243,7 @@ interface AppContextType extends AppState {
   moveExpense: (expenseId: string, targetBudgetId: string) => void;
   setManualBudgetOrder: (order: string[]) => void;
   setArchivedBudgetColor: (color: string) => void;
+  setAutoDistributionStrategy: (strategy: AutoDistributionStrategy) => void;
   resetApp: () => Promise<void>;
 }
 
@@ -306,6 +314,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     localStorage.setItem('archivedBudgetColor', state.archivedBudgetColor);
   }, [state.archivedBudgetColor]);
 
+  useEffect(() => {
+    localStorage.setItem('autoDistributionStrategy', state.autoDistributionStrategy);
+  }, [state.autoDistributionStrategy]);
+
 
   const getBudgetExpenses = useCallback((budgetId: string) => {
     return state.expenses.filter(expense => expense.presupuestoId === budgetId);
@@ -320,6 +332,53 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     
     return initialAvailable - totalSpent;
   }, [state.budgets, getBudgetExpenses]);
+
+  // New function to find a budget based on strategy
+  const findAutoBudget = useCallback((amount: number, strategy: AutoDistributionStrategy, excludeBudgetId?: string): string | null => {
+      if (strategy === 'manual') return null;
+
+      // Filter valid candidates: Not archived, not the excluded one, and has enough remaining funds
+      const candidates = state.budgets.filter(b => {
+          if (b.isArchived) return false;
+          if (excludeBudgetId && b.id === excludeBudgetId) return false;
+          
+          const remaining = getBudgetRemaining(b.id);
+          return remaining >= amount;
+      });
+
+      if (candidates.length === 0) return null;
+
+      switch (strategy) {
+          case 'best-fit':
+              // Sort by remaining ascending (closest to 0 after substraction)
+              // We want minimal (Remaining - Amount), since Amount is constant, we want minimal Remaining.
+              candidates.sort((a, b) => getBudgetRemaining(a.id) - getBudgetRemaining(b.id));
+              return candidates[0].id;
+
+          case 'largest-available':
+              // Sort by remaining descending
+              candidates.sort((a, b) => getBudgetRemaining(b.id) - getBudgetRemaining(a.id));
+              return candidates[0].id;
+
+          case 'newest':
+              // Sort by creation date descending
+              candidates.sort((a, b) => new Date(b.fechaCreacion).getTime() - new Date(a.fechaCreacion).getTime());
+              return candidates[0].id;
+
+          case 'oldest':
+              // Sort by creation date ascending
+              candidates.sort((a, b) => new Date(a.fechaCreacion).getTime() - new Date(b.fechaCreacion).getTime());
+              return candidates[0].id;
+
+          case 'random':
+               // Pick a random index
+               const randomIndex = Math.floor(Math.random() * candidates.length);
+               return candidates[randomIndex].id;
+          
+          default:
+              return null;
+      }
+  }, [state.budgets, getBudgetRemaining]);
 
 
   const addBudget = (budget: Omit<Budget, 'id' | 'fechaCreacion' | 'fechaModificacion'>) => {
@@ -384,6 +443,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const setArchivedBudgetColor = (color: string) => {
     dispatch({ type: 'SET_ARCHIVED_BUDGET_COLOR', payload: color });
   };
+  
+  const setAutoDistributionStrategy = (strategy: AutoDistributionStrategy) => {
+    dispatch({ type: 'SET_AUTO_DISTRIBUTION_STRATEGY', payload: strategy });
+  };
 
   const importFullBackup = (payload: { data: AppData, config: Partial<AppConfig> }) => {
     dispatch({ type: 'IMPORT_FULL_BACKUP', payload });
@@ -412,6 +475,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     localStorage.removeItem('budgetSortOrder');
     localStorage.removeItem('expenseSortOrder');
     localStorage.removeItem('archivedBudgetColor');
+    localStorage.removeItem('autoDistributionStrategy');
     addToast('Aplicación reseteada. Recargando...', 'success');
     setTimeout(() => {
       window.location.reload();
@@ -419,7 +483,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importFullBackup, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder, setArchivedBudgetColor, resetApp }}>
+    <AppContext.Provider value={{ ...state, dispatch, getBudgetExpenses, getBudgetRemaining, findAutoBudget, addBudget, updateBudget, deleteBudget, addExpense, updateExpense, deleteExpense, undoDeleteExpense, setTheme, setBudgetSortOrder, setExpenseSortOrder, importFullBackup, addToast, removeToast, reassignAndDeleteBudget, moveExpense, setManualBudgetOrder, setArchivedBudgetColor, setAutoDistributionStrategy, resetApp }}>
       {children}
     </AppContext.Provider>
   );

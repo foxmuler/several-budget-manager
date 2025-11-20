@@ -94,33 +94,37 @@ const MoveExpenseModal = ({ isOpen, onClose, onConfirm, expenseToMove, available
                     </select>
                 </div>
                 
-                {selectedStrategy === 'manual' ? (
-                    budgetsWithPositiveBalance.length > 0 ? (
-                        <div>
-                             <label htmlFor="targetBudgetMove" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nuevo capital de destino:</label>
-                            <select 
-                                id="targetBudgetMove" 
-                                value={targetBudgetId}
-                                onChange={(e) => setTargetBudgetId(e.target.value)}
-                                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
-                            >
-                               {budgetsWithPositiveBalance.map(b => (
-                                   <option key={b.id} value={b.id}>
-                                       {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
-                                    </option>
-                               ))}
-                            </select>
-                        </div>
-                    ) : (
-                        <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                <div>
+                     <label htmlFor="targetBudgetMove" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nuevo capital de destino:</label>
+                    <select 
+                        id="targetBudgetMove" 
+                        value={targetBudgetId}
+                        onChange={(e) => setTargetBudgetId(e.target.value)}
+                        disabled={selectedStrategy !== 'manual'}
+                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-500"
+                    >
+                       {budgetsWithPositiveBalance.map(b => (
+                           <option key={b.id} value={b.id}>
+                               {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
+                            </option>
+                       ))}
+                    </select>
+                    {selectedStrategy !== 'manual' && (
+                         <p className="mt-2 text-center text-sm font-bold text-orange-500 dark:text-orange-400">
+                            El capital será seleccionado automáticamente: {
+                                selectedStrategy === 'best-fit' ? 'Ajustado al gasto' :
+                                selectedStrategy === 'largest-available' ? 'Último Capital Grande' :
+                                selectedStrategy === 'newest' ? 'Último capital introducido' :
+                                selectedStrategy === 'oldest' ? 'Capital más antiguo' : 'Capital Auto'
+                            }
+                        </p>
+                    )}
+                    {selectedStrategy === 'manual' && budgetsWithPositiveBalance.length === 0 && (
+                        <p className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
                             No hay otros capitales con saldo positivo disponibles para mover el gasto.
                         </p>
-                    )
-                ) : (
-                    <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md text-center text-sm text-gray-600 dark:text-gray-300">
-                        El destino será calculado automáticamente: <strong>{selectedStrategy}</strong>
-                    </div>
-                )}
+                    )}
+                </div>
                 
                 <div className="flex justify-end space-x-3 pt-2">
                     <button 

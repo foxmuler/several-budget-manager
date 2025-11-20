@@ -201,27 +201,34 @@ const ExpenseForm = ({ onSave, expenseToEdit, defaultBudgetId }: ExpenseFormProp
                     </select>
                 </div>
 
-                {selectedStrategy === 'manual' ? (
-                    <div>
-                        <label htmlFor="presupuestoId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asociar a Capital</label>
-                        <select id="presupuestoId" name="presupuestoId" value={formData.presupuestoId} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500">
-                            {availableBudgetsForForm.map(b => (
-                                <option key={b.id} value={b.id}>
-                                    {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                ) : (
-                     <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md text-center text-sm text-gray-600 dark:text-gray-300">
-                        El capital será seleccionado automáticamente al guardar según la estrategia: <strong>{
-                            selectedStrategy === 'best-fit' ? 'Ajustado al gasto' :
-                            selectedStrategy === 'largest-available' ? 'Último Capital Grande' :
-                            selectedStrategy === 'newest' ? 'Último introducido' :
-                            selectedStrategy === 'oldest' ? 'Más antiguo' : 'Auto/Aleatorio'
-                        }</strong>
-                    </div>
-                )}
+                <div>
+                    <label htmlFor="presupuestoId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Asociar a Capital</label>
+                    <select 
+                        id="presupuestoId" 
+                        name="presupuestoId" 
+                        value={formData.presupuestoId} 
+                        onChange={handleChange} 
+                        required 
+                        disabled={selectedStrategy !== 'manual'}
+                        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 py-3 pl-3 pr-10 text-lg text-center focus:border-primary-500 focus:outline-none focus:ring-primary-500 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-500"
+                    >
+                        {availableBudgetsForForm.map(b => (
+                            <option key={b.id} value={b.id}>
+                                {b.descripcion} ({getBudgetRemaining(b.id).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })} restante)
+                            </option>
+                        ))}
+                    </select>
+                    {selectedStrategy !== 'manual' && (
+                         <p className="mt-2 text-center text-sm font-bold text-orange-500 dark:text-orange-400">
+                            El capital será seleccionado automáticamente: {
+                                selectedStrategy === 'best-fit' ? 'Ajustado al gasto' :
+                                selectedStrategy === 'largest-available' ? 'Último Capital Grande' :
+                                selectedStrategy === 'newest' ? 'Último capital introducido' :
+                                selectedStrategy === 'oldest' ? 'Capital más antiguo' : 'Capital Auto'
+                            }
+                        </p>
+                    )}
+                </div>
 
                 <div className="pt-2">
                     <button

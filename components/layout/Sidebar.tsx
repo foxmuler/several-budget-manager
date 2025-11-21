@@ -236,27 +236,29 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                                                     const expenseCount = getBudgetExpenses(b.id).length;
                                                     return (
                                                         <div key={b.id} onClick={() => window.location.hash = `/budget/${b.id}`} className="block p-2 rounded-md bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
-                                                            <div className="flex items-center gap-2">
-                                                                {expenseCount > 0 && (
-                                                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
-                                                                        {expenseCount}
-                                                                    </span>
-                                                                )}
-                                                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }}></div>
-                                                                <div className="flex-1 truncate">
+                                                            <div className="flex items-start justify-between">
+                                                                <div className="truncate pr-2">
                                                                     <p className="font-medium text-gray-800 dark:text-gray-100 truncate">
                                                                         {b.descripcion}
                                                                         <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
                                                                             {formatMonthYear(b.fechaCreacion)}
                                                                         </span>
                                                                     </p>
-                                                                    <div className="flex justify-between items-center">
-                                                                        <p className="text-sm text-gray-500 dark:text-gray-400">{b.numeroReferencia}</p>
-                                                                        <p className="text-xs text-gray-400 dark:text-gray-500 italic">Off {formatMonthYear(b.fechaModificacion)}</p>
-                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center flex-shrink-0 mt-1">
+                                                                     {expenseCount > 0 && (
+                                                                        <span className="text-xs font-bold mr-1.5 text-gray-500 dark:text-gray-400">
+                                                                            {expenseCount}
+                                                                        </span>
+                                                                    )}
+                                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: b.color }}></div>
                                                                 </div>
                                                             </div>
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-5">
+                                                            <div className="flex justify-between items-center mt-1">
+                                                                <p className="text-sm text-gray-500 dark:text-gray-400">{b.numeroReferencia}</p>
+                                                                <p className="text-xs text-gray-400 dark:text-gray-500 italic">Off {formatMonthYear(b.fechaModificacion)}</p>
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                                 Total Gastado: {
                                                                     (b.capitalTotal * b.porcentajeUsable / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR'})
                                                                 }

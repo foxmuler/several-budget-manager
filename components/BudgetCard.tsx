@@ -111,13 +111,13 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onDeleteRequest }) => {
                 className="relative bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 transition-transform transform hover:scale-105 hover:shadow-xl cursor-pointer"
             >
                 <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-bold text-lg truncate text-gray-800 dark:text-gray-100">
+                    <h3 className="font-bold text-lg truncate text-gray-800 dark:text-gray-100 flex-grow pr-2">
                         {budget.descripcion}
                         <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
                             {formatMonthYear(budget.fechaCreacion)}
                         </span>
                     </h3>
-                    <div className="flex items-center">
+                    <div className="flex items-center flex-shrink-0">
                         {budget.isRestored && <span className="text-xs font-bold mr-1.5 text-gray-500 dark:text-gray-400" title="Restaurado">R</span>}
                         {expenseCount > 0 && (
                             <span className="text-xs font-bold mr-1.5 text-gray-500 dark:text-gray-400">

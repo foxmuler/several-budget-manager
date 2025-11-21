@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
@@ -17,6 +16,12 @@ const FolderIcon = ({ className }: { className: string }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
 );
 
+const formatMonthYear = (dateString: string) => {
+    const date = new Date(dateString);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${year}`;
+};
 
 interface SidebarProps {
   isOpen: boolean;
@@ -227,22 +232,38 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                                                 <span className="font-medium">{year}</span>
                                             </summary>
                                             <div className="pl-6 pt-2 space-y-2">
-                                                {archivedBudgetsByYear[year].map(b => (
-                                                    <div key={b.id} onClick={() => window.location.hash = `/budget/${b.id}`} className="block p-2 rounded-md bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }}></div>
-                                                            <div className="flex-1 truncate">
-                                                                <p className="font-medium text-gray-800 dark:text-gray-100 truncate">{b.descripcion}</p>
-                                                                <p className="text-sm text-gray-500 dark:text-gray-400">{b.numeroReferencia}</p>
+                                                {archivedBudgetsByYear[year].map(b => {
+                                                    const expenseCount = getBudgetExpenses(b.id).length;
+                                                    return (
+                                                        <div key={b.id} onClick={() => window.location.hash = `/budget/${b.id}`} className="block p-2 rounded-md bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
+                                                            <div className="flex items-center gap-2">
+                                                                {expenseCount > 0 && (
+                                                                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+                                                                        {expenseCount}
+                                                                    </span>
+                                                                )}
+                                                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: b.color }}></div>
+                                                                <div className="flex-1 truncate">
+                                                                    <p className="font-medium text-gray-800 dark:text-gray-100 truncate">
+                                                                        {b.descripcion}
+                                                                        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
+                                                                            {formatMonthYear(b.fechaCreacion)}
+                                                                        </span>
+                                                                    </p>
+                                                                    <div className="flex justify-between items-center">
+                                                                        <p className="text-sm text-gray-500 dark:text-gray-400">{b.numeroReferencia}</p>
+                                                                        <p className="text-xs text-gray-400 dark:text-gray-500 italic">Off {formatMonthYear(b.fechaModificacion)}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-5">
+                                                                Total Gastado: {
+                                                                    (b.capitalTotal * b.porcentajeUsable / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR'})
+                                                                }
                                                             </div>
                                                         </div>
-                                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                            Total Gastado: {
-                                                                (b.capitalTotal * b.porcentajeUsable / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR'})
-                                                            }
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </details>
                                     ))

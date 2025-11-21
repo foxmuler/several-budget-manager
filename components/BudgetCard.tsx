@@ -1,3 +1,4 @@
+
 import React, { useRef, useState } from 'react';
 import { Budget } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -12,6 +13,13 @@ const DeleteIcon = ({ className }: { className: string }) => (
         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
     </svg>
 );
+
+const formatMonthYear = (dateString: string) => {
+    const date = new Date(dateString);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${year}`;
+};
 
 // FIX: Typed the component with React.FC to resolve type errors when passing the 'key' prop.
 const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onDeleteRequest }) => {
@@ -103,7 +111,12 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onDeleteRequest }) => {
                 className="relative bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 transition-transform transform hover:scale-105 hover:shadow-xl cursor-pointer"
             >
                 <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-bold text-lg truncate text-gray-800 dark:text-gray-100">{budget.descripcion}</h3>
+                    <h3 className="font-bold text-lg truncate text-gray-800 dark:text-gray-100">
+                        {budget.descripcion}
+                        <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                            {formatMonthYear(budget.fechaCreacion)}
+                        </span>
+                    </h3>
                     <div className="flex items-center">
                         {budget.isRestored && <span className="text-xs font-bold mr-1.5 text-gray-500 dark:text-gray-400" title="Restaurado">R</span>}
                         {expenseCount > 0 && (

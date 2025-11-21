@@ -9,6 +9,13 @@ interface BudgetFormProps {
     budgetToEdit?: Budget;
 }
 
+const formatMonthYear = (dateString: string) => {
+    const date = new Date(dateString);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${year}`;
+};
+
 const BudgetForm = ({ onSave, budgetToEdit }: BudgetFormProps) => {
     const { addBudget, updateBudget, budgets, addToast } = useAppContext();
     const [formData, setFormData] = useState({
@@ -97,6 +104,11 @@ const BudgetForm = ({ onSave, budgetToEdit }: BudgetFormProps) => {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
+            {budgetToEdit && (
+                <div className="text-center text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    Creado: {formatMonthYear(budgetToEdit.fechaCreacion)}
+                </div>
+            )}
             <div>
                 <label htmlFor="numeroReferencia" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Nº Referencia</label>
                 <input type="text" name="numeroReferencia" id="numeroReferencia" value={formData.numeroReferencia} onChange={handleChange} required className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-lg text-center py-3" />

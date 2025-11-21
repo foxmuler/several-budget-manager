@@ -1,5 +1,3 @@
-
-
 import React, { useRef, useState } from 'react';
 import { Budget } from '../types';
 import { useAppContext } from '../context/AppContext';
@@ -10,18 +8,20 @@ interface BudgetCardProps {
 }
 
 const DeleteIcon = ({ className }: { className: string }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24" fill="currentColor">
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
     </svg>
 );
 
 // FIX: Typed the component with React.FC to resolve type errors when passing the 'key' prop.
 const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onDeleteRequest }) => {
-    const { getBudgetRemaining } = useAppContext();
+    const { getBudgetRemaining, getBudgetExpenses } = useAppContext();
     const remaining = getBudgetRemaining(budget.id);
     const initialAvailable = (budget.capitalTotal * budget.porcentajeUsable) / 100;
     const spent = initialAvailable - remaining;
     const spentPercentage = initialAvailable > 0 ? Math.max(0, Math.min(100, (spent / initialAvailable) * 100)) : 0;
+    
+    const expenseCount = getBudgetExpenses(budget.id).length;
 
     const [translateX, setTranslateX] = useState(0);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -106,6 +106,11 @@ const BudgetCard: React.FC<BudgetCardProps> = ({ budget, onDeleteRequest }) => {
                     <h3 className="font-bold text-lg truncate text-gray-800 dark:text-gray-100">{budget.descripcion}</h3>
                     <div className="flex items-center">
                         {budget.isRestored && <span className="text-xs font-bold mr-1.5 text-gray-500 dark:text-gray-400" title="Restaurado">R</span>}
+                        {expenseCount > 0 && (
+                            <span className="text-xs font-bold mr-1.5 text-gray-500 dark:text-gray-400">
+                                {expenseCount}
+                            </span>
+                        )}
                         <div className="w-4 h-4 rounded-full" style={{ backgroundColor: budget.color }}></div>
                     </div>
                 </div>
